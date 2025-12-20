@@ -1,0 +1,50 @@
+# Pipeline Configuration Settings
+
+# LLM Configuration
+llm:
+  model_name: "gemini-2.5-flash"
+  temperature: 0.7
+  max_retries: 3
+  retry_delay: 2
+  rate_limit_delay: 13  # Delay between requests to avoid rate limits (free tier: 5 req/min = 12s)
+
+# Agent Generation Settings
+agent_generation:
+  default_n_agents: 1
+  default_design_context: "camping tent"
+
+# Experience Simulation Settings
+experience_simulation:
+  default_product: "tent"
+  n_steps: 3
+
+# Interview Settings
+interview:
+  max_followup_questions: 2
+
+# Need Extraction Settings
+need_extraction:
+  categories:
+    - Functional
+    - Usability
+    - Performance
+    - Safety
+    - Emotional
+    - Social
+    - Accessibility
+  priority_levels:
+    - High
+    - Medium
+    - Low
+
+# Output Settings
+output:
+  save_intermediate_results: false
+  export_format: "json"
+  results_directory: "results"
+
+# Logging Configuration
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_file: null  # Set to a filename to enable file logging
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

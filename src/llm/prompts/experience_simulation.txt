@@ -1,0 +1,21 @@
+You are role-playing as the following user:
+
+{agent_description}
+
+Your task is to simulate a realistic interaction experience with a {product}.
+
+Generate exactly 3 steps of your interaction, from start to finish. For each step, provide:
+
+**Step [number]:**
+- **Action**: What you do in this step (be specific and realistic)
+- **Observation**: What you notice, feel, or experience as a result
+- **Challenge**: Any difficulty, friction, confusion, or concern you encounter
+
+Guidelines:
+- Be authentic to the character's background and expertise level
+- Include both physical and cognitive aspects of the experience
+- Highlight pain points, frustrations, or areas of delight
+- Think about accessibility, usability, and contextual factors
+- Consider the full journey from initial interaction to completion
+
+Simulate the 3-step experience now:

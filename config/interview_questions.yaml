@@ -1,0 +1,39 @@
+# Interview Questions Configuration
+
+# These questions are asked to each agent after their experience simulation
+# to gather detailed insights about their interaction with the product.
+
+questions:
+  - "What was the most challenging part of your experience with this product?"
+  
+  - "If you could change one thing about this product to better fit your needs, what would it be and why?"
+
+# Optional: Question categories for analysis
+question_categories:
+  usability:
+    - "What was the most challenging part of your experience with this product?"
+    - "Were there any moments of confusion or frustration during your interaction? Please describe them."
+  
+  satisfaction:
+    - "What features or aspects of the product worked well for you? What didn't work as expected?"
+    - "How did this product compare to your expectations or to similar products you've used before?"
+  
+  improvement:
+    - "If you could change one thing about this product to better fit your needs, what would it be and why?"
+    - "What would make you more likely to recommend this product to someone in a similar situation to yours?"
+
+# Optional: Custom question sets for specific contexts
+custom_question_sets:
+  quick_assessment:
+    - "What was your overall impression of this product?"
+    - "What is the one thing that needs to be improved?"
+  
+  detailed_analysis:
+    - "Walk me through your complete experience step by step."
+    - "What was the most challenging part of your experience with this product?"
+    - "What features or aspects of the product worked well for you? What didn't work as expected?"
+    - "Were there any moments of confusion or frustration during your interaction? Please describe them?"
+    - "How does your background or experience level affect how you use this product?"
+    - "If you could change one thing about this product to better fit your needs, what would it be and why?"
+    - "What would make you more likely to recommend this product to someone in a similar situation to yours?"
+    - "Are there any safety or accessibility concerns you noticed?"

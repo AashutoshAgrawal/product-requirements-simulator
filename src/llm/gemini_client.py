@@ -1,0 +1,172 @@
+"""
+Gemini LLM Client Module
+
+This module provides a clean interface to interact with Google's Gemini API.
+It encapsulates all LLM-specific logic and configuration.
+"""
+
+import os
+import time
+from typing import Optional, Dict, Any
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+from ..utils.logger import get_logger
+
+# Load environment variables
+load_dotenv()
+
+logger = get_logger(__name__)
+
+
+class GeminiClient:
+    """
+    A client for interacting with Google's Gemini API.
+    
+    This class handles API authentication, request management, and response handling
+    for Gemini language models.
+    
+    Attributes:
+        model_name (str): The name of the Gemini model to use
+        temperature (float): Controls randomness in generation (0.0 to 1.0)
+        max_retries (int): Maximum number of retry attempts for failed requests
+        retry_delay (int): Delay in seconds between retry attempts
+    """
+    
+    def __init__(
+        self,
+        model_name: str = "gemini-1.5-flash",
+        temperature: float = 0.7,
+        max_retries: int = 3,
+        retry_delay: int = 2,
+        rate_limit_delay: float = 12.0
+    ):
+        """
+        Initialize the Gemini client.
+        
+        Args:
+            model_name: Name of the Gemini model to use
+            temperature: Sampling temperature (0.0 to 1.0)
+            max_retries: Maximum number of retry attempts
+            retry_delay: Delay between retries in seconds
+            rate_limit_delay: Delay between requests to avoid rate limits (seconds)
+            
+        Raises:
+            ValueError: If GOOGLE_API_KEY is not set in environment
+        """
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.rate_limit_delay = rate_limit_delay
+        self.last_request_time = 0
+        
+        # Configure API key
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "GOOGLE_API_KEY not found in environment variables. "
+                "Please set it in your .env file."
+            )
+        
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(model_name)
+        
+        logger.info(f"Initialized GeminiClient with model: {model_name}")
+        logger.info(f"Rate limit protection: {rate_limit_delay}s delay between requests")
+    
+    def run(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        max_output_tokens: Optional[int] = None
+    ) -> str:
+        """
+        Execute a prompt using the Gemini API.
+        
+        Args:
+            prompt: The text prompt to send to the model
+            temperature: Optional override for the default temperature
+            max_output_tokens: Optional maximum number of tokens to generate
+            
+        Returns:
+            The generated text response from the model
+            
+        Raises:
+            Exception: If all retry attempts fail
+        """
+        # Rate limit protection: wait if needed
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
+        
+        if time_since_last_request < self.rate_limit_delay and self.last_request_time > 0:
+            wait_time = self.rate_limit_delay - time_since_last_request
+            logger.debug(f"Rate limit protection: waiting {wait_time:.1f}s before next request")
+            time.sleep(wait_time)
+        
+        generation_config = {
+            "temperature": temperature if temperature is not None else self.temperature,
+        }
+        
+        if max_output_tokens:
+            generation_config["max_output_tokens"] = max_output_tokens
+        
+        for attempt in range(self.max_retries):
+            try:
+                logger.debug(f"Sending request to Gemini (attempt {attempt + 1}/{self.max_retries})")
+                
+                response = self.model.generate_content(
+                    prompt,
+                    generation_config=generation_config
+                )
+                
+                result = response.text
+                self.last_request_time = time.time()  # Update last request time
+                logger.debug(f"Successfully received response ({len(result)} characters)")
+                return result
+                
+            except Exception as e:
+                logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
+                
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay)
+                else:
+                    logger.error(f"All {self.max_retries} attempts failed")
+                    raise
+    
+    def run_with_config(
+        self,
+        prompt: str,
+        config: Dict[str, Any]
+    ) -> str:
+        """
+        Execute a prompt with a custom configuration dictionary.
+        
+        Args:
+            prompt: The text prompt to send to the model
+            config: Dictionary containing generation parameters
+            
+        Returns:
+            The generated text response from the model
+        """
+        return self.run(
+            prompt=prompt,
+            temperature=config.get("temperature"),
+            max_output_tokens=config.get("max_output_tokens")
+        )
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """
+        Get information about the current model configuration.
+        
+        Returns:
+            Dictionary containing model configuration details
+        """
+        return {
+            "model_name": self.model_name,
+            "temperature": self.temperature,
+            "max_retries": self.max_retries,
+            "retry_delay": self.retry_delay,
+            "rate_limit_delay": self.rate_limit_delay
+        }
+

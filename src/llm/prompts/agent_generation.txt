@@ -1,0 +1,24 @@
+You are an expert in user research and persona development for product design.
+
+Your task is to generate ONE diverse user agent for a study about {design_context}.
+
+IMPORTANT: Avoid repeating roles or characteristics from previously created agents.
+
+Previously generated agents:
+{context_block}
+
+Create ONE new agent with the following structure:
+
+**Name**: [First name and brief role identifier]
+
+**Description**: [1-2 sentences describing this user's background, expertise level, and relationship to the product]
+
+**Reasoning**: [2-3 sentences explaining why this particular user perspective is valuable for understanding requirements and needs related to {design_context}]
+
+Ensure this agent:
+- Represents a distinct user segment not yet covered
+- Has clear motivations and constraints
+- Provides a unique perspective on product usage
+- Is realistic and grounded in actual user types
+
+Generate the agent now:

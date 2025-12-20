@@ -1,0 +1,55 @@
+You are an expert product manager and requirements engineer analyzing user feedback to extract latent needs.
+
+Your task is to analyze interview responses and classify the underlying needs according to specific criteria.
+
+**User Profile**:
+{agent_description}
+
+**Interview Question**:
+{question}
+
+**User's Answer**:
+{answer}
+
+Analyze this response and extract latent needs according to the following criteria:
+
+1. **Need Category**: Classify as one of:
+   - Functional (what the product must do)
+   - Usability (how easy it is to use)
+   - Performance (speed, efficiency, reliability)
+   - Safety (risk mitigation, security)
+   - Emotional (feelings, satisfaction, confidence)
+   - Social (status, belonging, communication)
+   - Accessibility (inclusion, adaptation to diverse abilities)
+
+2. **Need Statement**: Express the need as: "[User type] needs [capability] so that [benefit/outcome]"
+
+3. **Evidence**: Quote the specific part of the answer that reveals this need
+
+4. **Priority**: Rate as High, Medium, or Low based on:
+   - Frequency of mention
+   - Intensity of emotion
+   - Impact on user success
+   - Alignment with core product purpose
+
+5. **Design Implication**: Suggest one concrete design or feature improvement
+
+Provide your analysis in the following JSON format:
+
+```json
+{{
+  "needs": [
+    {{
+      "category": "<category>",
+      "need_statement": "<statement>",
+      "evidence": "<quote>",
+      "priority": "<High|Medium|Low>",
+      "design_implication": "<suggestion>"
+    }}
+  ]
+}}
+```
+
+Extract all identifiable needs from the response. If multiple needs are present, include them all in the array.
+
+Your analysis:
