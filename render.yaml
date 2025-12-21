@@ -1,0 +1,26 @@
+# Render Blueprint for scalable deployment
+services:
+  # FastAPI Backend
+  - type: web
+    name: elicitron-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app_fastapi:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    healthCheckPath: /
+    autoDeploy: true
+    
+    # Scalability settings
+    scaling:
+      minInstances: 1
+      maxInstances: 10  # Can scale up to 10 instances under load
+    
+    # When you upgrade (future):
+    # plan: starter  # $7/mo - 512MB RAM
+    # plan: standard # $25/mo - 2GB RAM, autoscaling
