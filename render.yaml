@@ -11,6 +11,13 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      # Add your API keys in Render Dashboard (not here in code)
+      # Go to: Dashboard > elicitron-backend > Environment
+      # Add these variables:
+      # GOOGLE_API_KEY_1 = your_first_key
+      # GOOGLE_API_KEY_2 = your_second_key
+      # GOOGLE_API_KEY_3 = your_third_key
+      # ... add as many as you need
     healthCheckPath: /api/health
     autoDeploy: true
     

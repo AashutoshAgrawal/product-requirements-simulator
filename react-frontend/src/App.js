@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import './App.css';
 import axios from 'axios';
+import config from './config';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = config.apiUrl;
 
 function App() {
   const [product, setProduct] = useState('');

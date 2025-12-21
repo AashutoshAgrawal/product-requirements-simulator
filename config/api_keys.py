@@ -1,6 +1,7 @@
 """
 API Key Management for Elicitron
 Supports multiple API keys for load balancing across agents
+Reads keys from environment variables for security
 """
 import os
 import random
@@ -9,19 +10,49 @@ from typing import List, Optional
 class APIKeyManager:
     """Manages multiple Google Gemini API keys for load balancing"""
     
-    # Primary API keys pool - add more keys here for scaling
-    API_KEYS = [
-        "AIzaSyC1HBVK2XY-gebCyE6N77q6IsklqMRRfxY",  # Primary key
-        # Add more keys below as you scale:
-        # "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",  # Key 2
-        # "AIzaSyYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",  # Key 3
-        # "AIzaSyZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",  # Key 4
-    ]
-    
     def __init__(self):
-        """Initialize API key manager"""
+        """Initialize API key manager and load keys from environment"""
+        # Load API keys from environment variables
+        # Format: GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3, etc.
+        self.API_KEYS = self._load_api_keys_from_env()
+        
+        if not self.API_KEYS:
+            raise ValueError(
+                "No API keys found in environment variables. "
+                "Please set GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, etc. "
+                "in your Render dashboard or .env file."
+            )
+        
         self._current_key_index = 0
         self._key_usage_count = {key: 0 for key in self.API_KEYS}
+        print(f"✅ Loaded {len(self.API_KEYS)} API key(s) from environment")
+    
+    def _load_api_keys_from_env(self) -> List[str]:
+        """
+        Load API keys from environment variables
+        Looks for GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, etc.
+        """
+        keys = []
+        index = 1
+        
+        # Try to load numbered keys (GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, ...)
+        while True:
+            key_name = f"GOOGLE_API_KEY_{index}"
+            key_value = os.getenv(key_name)
+            
+            if key_value:
+                keys.append(key_value)
+                index += 1
+            else:
+                break
+        
+        # If no numbered keys, try legacy GOOGLE_API_KEY
+        if not keys:
+            legacy_key = os.getenv("GOOGLE_API_KEY")
+            if legacy_key:
+                keys.append(legacy_key)
+        
+        return keys
         
     def get_api_key(self, strategy: str = "round_robin") -> str:
         """
