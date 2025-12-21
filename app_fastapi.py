@@ -140,10 +140,9 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         
         # Stage 1: Generate agents
         agents = await asyncio.to_thread(
-            pipeline.generate_agents,
-            product_idea,
-            design_context,
-            n_agents
+            pipeline.agent_generator.generate_agents,
+            n_agents,
+            design_context
         )
         
         jobs[job_id]["progress"] = {
@@ -153,7 +152,7 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         
         # Stage 2: Simulate experiences
         experiences = await asyncio.to_thread(
-            pipeline.simulate_experiences,
+            pipeline.experience_simulator.simulate_multiple_experiences,
             agents,
             product_idea
         )
@@ -165,10 +164,8 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         
         # Stage 3: Conduct interviews
         interviews = await asyncio.to_thread(
-            pipeline.conduct_interviews,
-            agents,
-            experiences,
-            product_idea
+            pipeline.interviewer.conduct_multiple_interviews,
+            experiences
         )
         
         jobs[job_id]["progress"] = {
@@ -178,15 +175,13 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         
         # Stage 4: Extract needs
         need_extractions = await asyncio.to_thread(
-            pipeline.extract_latent_needs,
-            agents,
-            interviews,
-            product_idea
+            pipeline.need_extractor.extract_from_multiple_interviews,
+            interviews
         )
         
         # Aggregate results
         aggregated_needs = await asyncio.to_thread(
-            pipeline.aggregate_needs,
+            pipeline.need_extractor.aggregate_needs,
             need_extractions
         )
         
