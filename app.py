@@ -331,17 +331,42 @@ def api_results(job_id):
 
 
 if __name__ == '__main__':
+    import os
+    
     config = load_config()
     web_config = config.get('web_app', {})
     
     # Detect if running on Streamlit Cloud or other cloud platforms
-    import os
-    is_cloud = os.environ.get('STREAMLIT_SHARING_MODE') or os.environ.get('KUBERNETES_SERVICE_HOST')
+    is_cloud = (
+        os.environ.get('STREAMLIT_SHARING_MODE') or 
+        os.environ.get('KUBERNETES_SERVICE_HOST') or
+        os.environ.get('HOME', '').startswith('/home/appuser') or
+        os.environ.get('HOME', '').startswith('/home/adminuser')
+    )
     
-    host = web_config.get('host', '0.0.0.0' if is_cloud else '127.0.0.1')
-    port = int(os.environ.get('PORT', web_config.get('port', 5000)))
-    debug = False if is_cloud else web_config.get('debug', True)
+    # Use environment PORT if available, otherwise use a random available port on cloud
+    if is_cloud:
+        host = '0.0.0.0'
+        port = int(os.environ.get('PORT', 8501))  # Streamlit typically uses 8501
+        debug = False
+        use_reloader = False
+    else:
+        host = web_config.get('host', '127.0.0.1')
+        port = web_config.get('port', 5000)
+        debug = web_config.get('debug', True)
+        use_reloader = debug
     
-    logger.info(f"Starting Elicitron web application on {host}:{port}")
-    app.run(host=host, port=port, debug=debug, use_reloader=False)
+    logger.info(f"Starting Elicitron web application on {host}:{port} (cloud={is_cloud}, debug={debug})")
+    
+    try:
+        app.run(host=host, port=port, debug=debug, use_reloader=use_reloader)
+    except OSError as e:
+        if "Address already in use" in str(e):
+            logger.error(f"Port {port} is already in use. Trying alternative port...")
+            import random
+            port = random.randint(8000, 9000)
+            logger.info(f"Retrying on port {port}")
+            app.run(host=host, port=port, debug=False, use_reloader=False)
+        else:
+            raise
 
