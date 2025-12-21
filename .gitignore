@@ -19,3 +19,7 @@ yarn-error.log*
 
 # Production
 react-frontend/build/
+
+# Logs
+logs/
+*.log

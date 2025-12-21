@@ -5,54 +5,14 @@ This module provides a clean interface to interact with Google's Gemini API.
 It encapsulates all LLM-specific logic and configuration.
 """
 
-import os
 import time
 from typing import Optional, Dict, Any
-from pathlib import Path
 import google.generativeai as genai
-from dotenv import load_dotenv
 
 from ..utils.logger import get_logger
-
-# Load environment variables
-load_dotenv()
+from config.api_keys import get_api_key
 
 logger = get_logger(__name__)
-
-
-def get_api_key() -> Optional[str]:
-    """
-    Get API key from environment variables, .env file, or .streamlit/secrets.toml.
-    
-    Returns:
-        API key string or None if not found
-    """
-    # First try regular environment variable
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if api_key:
-        return api_key
-    
-    # Try loading from .streamlit/secrets.toml (for Streamlit Cloud)
-    try:
-        import toml
-        secrets_path = Path(__file__).parent.parent.parent / '.streamlit' / 'secrets.toml'
-        if secrets_path.exists():
-            secrets = toml.load(secrets_path)
-            api_key = secrets.get('GOOGLE_API_KEY')
-            if api_key:
-                return api_key
-    except Exception as e:
-        logger.debug(f"Could not load from secrets.toml: {e}")
-    
-    # Try Streamlit secrets as fallback (when Streamlit manages the secret)
-    try:
-        import streamlit as st
-        if hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets:
-            return st.secrets['GOOGLE_API_KEY']
-    except ImportError:
-        pass
-    
-    return None
 
 
 class GeminiClient:
@@ -101,8 +61,8 @@ class GeminiClient:
         api_key = get_api_key()
         if not api_key:
             raise ValueError(
-                "GOOGLE_API_KEY not found in environment variables or Streamlit secrets. "
-                "Please set it in your .env file (local) or Streamlit secrets (cloud)."
+                "No API keys available in config/api_keys.py. "
+                "Please add at least one API key to the API_KEYS list."
             )
         
         genai.configure(api_key=api_key)
