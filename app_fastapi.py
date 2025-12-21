@@ -117,7 +117,11 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         interview_questions = load_interview_questions()
         
         # Initialize LLM client
-        llm_client = GeminiClient(config=config.get('llm', {}))
+        llm_config = config.get('llm', {})
+        llm_client = GeminiClient(
+            model_name=llm_config.get('model_name', 'gemini-1.5-flash'),
+            temperature=llm_config.get('temperature', 0.7)
+        )
         
         # Create pipeline
         pipeline = RequirementsPipeline(
