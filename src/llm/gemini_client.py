@@ -8,6 +8,7 @@ It encapsulates all LLM-specific logic and configuration.
 import os
 import time
 from typing import Optional, Dict, Any
+from pathlib import Path
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -21,7 +22,7 @@ logger = get_logger(__name__)
 
 def get_api_key() -> Optional[str]:
     """
-    Get API key from environment variables or Streamlit secrets.
+    Get API key from environment variables, .env file, or .streamlit/secrets.toml.
     
     Returns:
         API key string or None if not found
@@ -31,7 +32,19 @@ def get_api_key() -> Optional[str]:
     if api_key:
         return api_key
     
-    # Try Streamlit secrets if running in Streamlit
+    # Try loading from .streamlit/secrets.toml (for Streamlit Cloud)
+    try:
+        import toml
+        secrets_path = Path(__file__).parent.parent.parent / '.streamlit' / 'secrets.toml'
+        if secrets_path.exists():
+            secrets = toml.load(secrets_path)
+            api_key = secrets.get('GOOGLE_API_KEY')
+            if api_key:
+                return api_key
+    except Exception as e:
+        logger.debug(f"Could not load from secrets.toml: {e}")
+    
+    # Try Streamlit secrets as fallback (when Streamlit manages the secret)
     try:
         import streamlit as st
         if hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets:

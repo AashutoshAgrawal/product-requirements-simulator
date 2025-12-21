@@ -9,6 +9,7 @@ pyyaml==6.0.1
 
 # Environment Management
 python-dotenv==1.2.1
+toml==0.10.2
 
 # Utilities
 numpy==2.4.0
