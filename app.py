@@ -334,10 +334,14 @@ if __name__ == '__main__':
     config = load_config()
     web_config = config.get('web_app', {})
     
-    host = web_config.get('host', '127.0.0.1')
-    port = web_config.get('port', 5000)
-    debug = web_config.get('debug', True)
+    # Detect if running on Streamlit Cloud or other cloud platforms
+    import os
+    is_cloud = os.environ.get('STREAMLIT_SHARING_MODE') or os.environ.get('KUBERNETES_SERVICE_HOST')
+    
+    host = web_config.get('host', '0.0.0.0' if is_cloud else '127.0.0.1')
+    port = int(os.environ.get('PORT', web_config.get('port', 5000)))
+    debug = False if is_cloud else web_config.get('debug', True)
     
     logger.info(f"Starting Elicitron web application on {host}:{port}")
-    app.run(host=host, port=port, debug=debug)
+    app.run(host=host, port=port, debug=debug, use_reloader=False)
 
