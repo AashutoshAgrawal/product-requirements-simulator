@@ -14,11 +14,10 @@ services:
     healthCheckPath: /api/health
     autoDeploy: true
     
-    # Scalability settings
-    scaling:
-      minInstances: 1
-      maxInstances: 10  # Can scale up to 10 instances under load
-    
-    # When you upgrade (future):
-    # plan: starter  # $7/mo - 512MB RAM
-    # plan: standard # $25/mo - 2GB RAM, autoscaling
+    # Note: Auto-scaling requires paid plans (starter or above)
+    # When you upgrade to enable auto-scaling:
+    # plan: starter  # $7/mo - 512MB RAM, basic scaling
+    # plan: standard # $25/mo - 2GB RAM, full autoscaling
+    # scaling:
+    #   minInstances: 1
+    #   maxInstances: 10
