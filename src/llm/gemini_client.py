@@ -19,6 +19,29 @@ load_dotenv()
 logger = get_logger(__name__)
 
 
+def get_api_key() -> Optional[str]:
+    """
+    Get API key from environment variables or Streamlit secrets.
+    
+    Returns:
+        API key string or None if not found
+    """
+    # First try regular environment variable
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if api_key:
+        return api_key
+    
+    # Try Streamlit secrets if running in Streamlit
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets:
+            return st.secrets['GOOGLE_API_KEY']
+    except ImportError:
+        pass
+    
+    return None
+
+
 class GeminiClient:
     """
     A client for interacting with Google's Gemini API.
@@ -62,11 +85,11 @@ class GeminiClient:
         self.last_request_time = 0
         
         # Configure API key
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = get_api_key()
         if not api_key:
             raise ValueError(
-                "GOOGLE_API_KEY not found in environment variables. "
-                "Please set it in your .env file."
+                "GOOGLE_API_KEY not found in environment variables or Streamlit secrets. "
+                "Please set it in your .env file (local) or Streamlit secrets (cloud)."
             )
         
         genai.configure(api_key=api_key)
