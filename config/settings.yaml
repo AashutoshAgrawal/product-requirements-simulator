@@ -48,3 +48,10 @@ logging:
   level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
   log_file: null  # Set to a filename to enable file logging
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Web Application Configuration
+web_app:
+  host: "127.0.0.1"
+  port: 5000
+  debug: true
+  enable_caching: false
