@@ -126,7 +126,6 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         # Create pipeline
         pipeline = RequirementsPipeline(
             llm_client=llm_client,
-            config=config,
             interview_questions=interview_questions
         )
         
