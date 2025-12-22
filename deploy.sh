@@ -5,7 +5,7 @@
 PROJECT_ID="your-gcp-project-id"
 REGION="us-central1"
 SERVICE_NAME="elicitron-backend"
-API_KEY="AIzaSyC1HBVK2XY-gebCyE6N77q6IsklqMRRfxY"
+API_KEY="your_gemini_api_key_here"
 
 echo "🚀 Deploying Elicitron Backend to Google Cloud Run..."
 

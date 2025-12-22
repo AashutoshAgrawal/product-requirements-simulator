@@ -23,7 +23,7 @@ A production-grade **FastAPI + React** application that automates requirements e
    - Go to https://render.com → Sign up with GitHub
    - Click "New +" → "Blueprint"
    - Select: `AashutoshAgrawal/product-requirements-simulator`
-   - Add environment variable: `GOOGLE_API_KEY=AIzaSyC1HBVK2XY-gebCyE6N77q6IsklqMRRfxY`
+   - Add environment variable: `GOOGLE_API_KEY=your_gemini_api_key_here`
    - Click "Apply" → Wait 5-10 minutes
    - **Backend URL**: `https://elicitron-backend.onrender.com`
    - **Frontend URL**: `https://elicitron-frontend.onrender.com`

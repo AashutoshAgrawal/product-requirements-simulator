@@ -43,13 +43,13 @@ This application supports **multiple API keys** for load balancing across many a
 
    ```
    Key: GOOGLE_API_KEY_1
-   Value: AIzaSyC1HBVK2XY-gebCyE6N77q6IsklqMRRfxY
+   Value: your_first_api_key_here
 
    Key: GOOGLE_API_KEY_2
-   Value: your_second_key_here
+   Value: your_second_api_key_here
 
    Key: GOOGLE_API_KEY_3
-   Value: your_third_key_here
+   Value: your_third_api_key_here
 
    ... (add as many as you need)
    ```
