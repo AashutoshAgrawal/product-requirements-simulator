@@ -13,8 +13,10 @@ class APIKeyManager:
     def __init__(self):
         """Initialize API key manager and load keys from environment"""
         # Load API keys from environment variables
-        # Format: GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3, etc.
-        self.API_KEYS = self._load_api_keys_from_env()
+        # Format: 
+        # GOOGLE_API_KEY_1=key_value
+        # GOOGLE_API_KEY_1_NAME=Agent-1-TentDesign (optional description)
+        self.API_KEYS, self.KEY_NAMES = self._load_api_keys_from_env()
         
         if not self.API_KEYS:
             raise ValueError(
@@ -25,14 +27,24 @@ class APIKeyManager:
         
         self._current_key_index = 0
         self._key_usage_count = {key: 0 for key in self.API_KEYS}
+        
+        # Print loaded keys with names
         print(f"✅ Loaded {len(self.API_KEYS)} API key(s) from environment")
+        for i, (key, name) in enumerate(zip(self.API_KEYS, self.KEY_NAMES), 1):
+            print(f"   Key {i}: {name}")
     
-    def _load_api_keys_from_env(self) -> List[str]:
+    def _load_api_keys_from_env(self) -> tuple[List[str], List[str]]:
         """
-        Load API keys from environment variables
-        Looks for GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, etc.
+        Load API keys and their names from environment variables
+        Looks for:
+        - GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, etc. (required)
+        - GOOGLE_API_KEY_1_NAME, GOOGLE_API_KEY_2_NAME, etc. (optional)
+        
+        Returns:
+            Tuple of (keys_list, names_list)
         """
         keys = []
+        names = []
         index = 1
         
         # Try to load numbered keys (GOOGLE_API_KEY_1, GOOGLE_API_KEY_2, ...)
@@ -42,6 +54,15 @@ class APIKeyManager:
             
             if key_value:
                 keys.append(key_value)
+                
+                # Try to load optional name/description
+                name_var = f"GOOGLE_API_KEY_{index}_NAME"
+                name_value = os.getenv(name_var)
+                if name_value:
+                    names.append(name_value)
+                else:
+                    names.append(f"API Key {index}")  # Default name
+                
                 index += 1
             else:
                 break
@@ -51,8 +72,9 @@ class APIKeyManager:
             legacy_key = os.getenv("GOOGLE_API_KEY")
             if legacy_key:
                 keys.append(legacy_key)
+                names.append("Legacy API Key")
         
-        return keys
+        return keys, names
         
     def get_api_key(self, strategy: str = "round_robin") -> str:
         """
@@ -105,20 +127,39 @@ class APIKeyManager:
         # Use modulo to distribute agents evenly across keys
         key_index = agent_id % len(self.API_KEYS)
         key = self.API_KEYS[key_index]
+        key_name = self.KEY_NAMES[key_index]
         self._key_usage_count[key] += 1
+        
+        print(f"🔑 Agent {agent_id} using: {key_name}")
         return key
+    
+    def get_key_info(self, key: str) -> str:
+        """Get the name/description for a specific key"""
+        try:
+            index = self.API_KEYS.index(key)
+            return self.KEY_NAMES[index]
+        except (ValueError, IndexError):
+            return "Unknown Key"
     
     def get_all_keys(self) -> List[str]:
         """Get all available API keys"""
         return self.API_KEYS.copy()
+    
+    def get_all_key_names(self) -> List[str]:
+        """Get all key names/descriptions"""
+        return self.KEY_NAMES.copy()
     
     def get_key_count(self) -> int:
         """Get number of available API keys"""
         return len(self.API_KEYS)
     
     def get_usage_stats(self) -> dict:
-        """Get usage statistics for each key"""
-        return self._key_usage_count.copy()
+        """Get usage statistics for each key with names"""
+        stats = {}
+        for key, count in self._key_usage_count.items():
+            key_name = self.get_key_info(key)
+            stats[key_name] = count
+        return stats
     
     @classmethod
     def get_primary_key(cls) -> str:
