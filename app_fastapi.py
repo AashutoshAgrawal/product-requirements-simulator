@@ -76,6 +76,7 @@ class JobStatusResponse(BaseModel):
     status: str
     progress: Optional[dict] = None
     error: Optional[str] = None
+    intermediate_results: Optional[dict] = None  # Agents, experiences, interviews, needs as they're generated
 
 
 class ResultsResponse(BaseModel):
@@ -129,9 +130,19 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
             interview_questions=interview_questions
         )
         
+        # Initialize intermediate results storage
+        jobs[job_id]["intermediate_results"] = {
+            "agents": [],
+            "experiences": [],
+            "interviews": [],
+            "needs": []
+        }
+        
         # Update progress
         jobs[job_id]["progress"] = {
             "stage": "generating_agents",
+            "stage_number": 1,
+            "total_stages": 4,
             "message": f"Generating {n_agents} agent persona(s)..."
         }
         
@@ -145,39 +156,82 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
             design_context
         )
         
+        # Store intermediate results
+        jobs[job_id]["intermediate_results"]["agents"] = agents
         jobs[job_id]["progress"] = {
-            "stage": "simulating_experiences",
-            "message": "Simulating user experiences..."
+            "stage": "generating_agents",
+            "stage_number": 1,
+            "total_stages": 4,
+            "message": f"✓ Generated {len(agents)} agent persona(s)",
+            "completed": True
         }
         
         # Stage 2: Simulate experiences
+        jobs[job_id]["progress"] = {
+            "stage": "simulating_experiences",
+            "stage_number": 2,
+            "total_stages": 4,
+            "message": "Simulating user experiences..."
+        }
+        
         experiences = await asyncio.to_thread(
             pipeline.experience_simulator.simulate_multiple_experiences,
             agents,
             product_idea
         )
         
+        # Store intermediate results
+        jobs[job_id]["intermediate_results"]["experiences"] = experiences
         jobs[job_id]["progress"] = {
-            "stage": "conducting_interviews",
-            "message": "Conducting follow-up interviews..."
+            "stage": "simulating_experiences",
+            "stage_number": 2,
+            "total_stages": 4,
+            "message": f"✓ Simulated {len(experiences)} experience(s)",
+            "completed": True
         }
         
         # Stage 3: Conduct interviews
+        jobs[job_id]["progress"] = {
+            "stage": "conducting_interviews",
+            "stage_number": 3,
+            "total_stages": 4,
+            "message": "Conducting follow-up interviews..."
+        }
+        
         interviews = await asyncio.to_thread(
             pipeline.interviewer.conduct_multiple_interviews,
             experiences
         )
         
+        # Store intermediate results
+        jobs[job_id]["intermediate_results"]["interviews"] = interviews
+        total_qa = sum(len(i.get("interview", [])) for i in interviews)
         jobs[job_id]["progress"] = {
-            "stage": "extracting_needs",
-            "message": "Extracting latent needs..."
+            "stage": "conducting_interviews",
+            "stage_number": 3,
+            "total_stages": 4,
+            "message": f"✓ Completed {len(interviews)} interview(s) ({total_qa} Q&A pairs)",
+            "completed": True
         }
         
         # Stage 4: Extract needs
+        jobs[job_id]["progress"] = {
+            "stage": "extracting_needs",
+            "stage_number": 4,
+            "total_stages": 4,
+            "message": "Extracting latent needs..."
+        }
+        
         need_extractions = await asyncio.to_thread(
             pipeline.need_extractor.extract_from_multiple_interviews,
             interviews
         )
+        
+        # Store intermediate results (flatten needs for easier display)
+        all_needs = []
+        for extraction in need_extractions:
+            all_needs.extend(extraction.get("needs", []))
+        jobs[job_id]["intermediate_results"]["needs"] = all_needs
         
         # Aggregate results
         aggregated_needs = await asyncio.to_thread(
@@ -305,7 +359,8 @@ async def get_status(job_id: str):
         job_id=job_id,
         status=job["status"],
         progress=job.get("progress"),
-        error=job.get("error")
+        error=job.get("error"),
+        intermediate_results=job.get("intermediate_results")
     )
 
 
