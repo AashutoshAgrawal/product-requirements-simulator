@@ -16,11 +16,15 @@ from datetime import datetime
 from typing import Dict, Optional, List
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import yaml
+
+# Load environment variables from .env file
+load_dotenv()
 
 from src.llm.gemini_client import GeminiClient  # GEMINI: Gemini client import
 from src.llm.openai_client import OpenAIClient
