@@ -9,8 +9,8 @@ function App() {
   const [product, setProduct] = useState('');
   const [designContext, setDesignContext] = useState('');
   const [nAgents, setNAgents] = useState(1);
-  const [jobId, setJobId] = useState(null);
-  const [status, setStatus] = useState(null);
+  const [, setJobId] = useState(null);
+  const [, setStatus] = useState(null);
   const [progress, setProgress] = useState(null);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
