@@ -10,7 +10,9 @@ import json
 import yaml
 from datetime import datetime
 
-from src.llm.gemini_client import GeminiClient
+from src.llm.gemini_client import GeminiClient  # GEMINI: Gemini client import
+from src.llm.openai_client import OpenAIClient
+from src.llm.base_client import BaseLLMClient
 from src.pipeline.pipeline import RequirementsPipeline
 from src.utils.logger import configure_logging, get_logger
 
@@ -130,20 +132,41 @@ def main():
     logger = get_logger(__name__)
     logger.info("Application started")
     
-    # Initialize LLM client
+    # Determine which LLM provider to use
+    provider = llm_config.get('provider', 'gemini').lower()
+    logger.info(f"Using LLM provider: {provider}")
+    
+    # Initialize LLM client based on provider
     try:
-        llm_client = GeminiClient(
-            model_name=llm_config.get('model_name', 'gemini-1.5-flash'),
-            temperature=llm_config.get('temperature', 0.7),
-            max_retries=llm_config.get('max_retries', 3),
-            retry_delay=llm_config.get('retry_delay', 2),
-            rate_limit_delay=llm_config.get('rate_limit_delay', 12.0)
-        )
+        if provider == 'openai':
+            llm_client = OpenAIClient(
+                model_name=llm_config.get('model_name', 'gpt-4o-mini'),
+                temperature=llm_config.get('temperature', 0.7),
+                max_retries=llm_config.get('max_retries', 3),
+                retry_delay=llm_config.get('retry_delay', 2),
+                rate_limit_delay=llm_config.get('rate_limit_delay', 0.0)
+            )
+            logger.info(f"OpenAI client initialized with model: {llm_config.get('model_name', 'gpt-4o-mini')}")
+        elif provider == 'gemini':
+            llm_client = GeminiClient(  # GEMINI: Initialize Gemini client
+                model_name=llm_config.get('model_name', 'gemini-1.5-flash'),
+                temperature=llm_config.get('temperature', 0.7),
+                max_retries=llm_config.get('max_retries', 3),
+                retry_delay=llm_config.get('retry_delay', 2),
+                rate_limit_delay=llm_config.get('rate_limit_delay', 12.0)
+            )
+            logger.info(f"Gemini client initialized with model: {llm_config.get('model_name', 'gemini-1.5-flash')}")  # GEMINI: Log Gemini initialization
+        else:
+            raise ValueError(f"Unsupported LLM provider: {provider}. Choose 'gemini' or 'openai'")
+        
         logger.info("LLM client initialized successfully")
     except ValueError as e:
         logger.error(f"Failed to initialize LLM client: {e}")
         print(f"\n❌ Error: {e}")
-        print("Please ensure GOOGLE_API_KEY is set in your .env file")
+        if provider == 'gemini':
+            print("Please ensure GOOGLE_API_KEY is set in your .env file")  # GEMINI: Error message for Gemini
+        elif provider == 'openai':
+            print("Please ensure OPENAI_API_KEY is set in your .env file")
         return
     
     # Load interview questions

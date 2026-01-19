@@ -1,7 +1,8 @@
 # Python Dependencies for Requirements Elicitation Pipeline
 
 # Core LLM Integration
-google-generativeai==0.8.6
+google-generativeai==0.8.6  # GEMINI: Google Gemini API client
+openai==1.58.1  # OpenAI API client
 
 # Data Processing
 pydantic==2.12.5

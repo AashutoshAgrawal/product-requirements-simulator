@@ -22,7 +22,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import yaml
 
-from src.llm.gemini_client import GeminiClient
+from src.llm.gemini_client import GeminiClient  # GEMINI: Gemini client import
+from src.llm.openai_client import OpenAIClient
+from src.llm.base_client import BaseLLMClient
 from src.pipeline.pipeline import RequirementsPipeline
 from src.utils.logger import configure_logging, get_logger
 
@@ -117,12 +119,30 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         config = load_config()
         interview_questions = load_interview_questions()
         
-        # Initialize LLM client
+        # Initialize LLM client based on provider
         llm_config = config.get('llm', {})
-        llm_client = GeminiClient(
-            model_name=llm_config.get('model_name', 'gemini-1.5-flash'),
-            temperature=llm_config.get('temperature', 0.7)
-        )
+        provider = llm_config.get('provider', 'gemini').lower()
+        
+        if provider == 'openai':
+            llm_client = OpenAIClient(
+                model_name=llm_config.get('model_name', 'gpt-4o-mini'),
+                temperature=llm_config.get('temperature', 0.7),
+                max_retries=llm_config.get('max_retries', 3),
+                retry_delay=llm_config.get('retry_delay', 2),
+                rate_limit_delay=llm_config.get('rate_limit_delay', 0.0)
+            )
+            logger.info(f"Job {job_id}: Using OpenAI with model {llm_config.get('model_name', 'gpt-4o-mini')}")
+        elif provider == 'gemini':
+            llm_client = GeminiClient(  # GEMINI: Initialize Gemini client
+                model_name=llm_config.get('model_name', 'gemini-1.5-flash'),
+                temperature=llm_config.get('temperature', 0.7),
+                max_retries=llm_config.get('max_retries', 3),
+                retry_delay=llm_config.get('retry_delay', 2),
+                rate_limit_delay=llm_config.get('rate_limit_delay', 12.0)
+            )
+            logger.info(f"Job {job_id}: Using Gemini with model {llm_config.get('model_name', 'gemini-1.5-flash')}")  # GEMINI: Log Gemini usage
+        else:
+            raise ValueError(f"Unsupported LLM provider: {provider}. Choose 'gemini' or 'openai'")
         
         # Create pipeline
         pipeline = RequirementsPipeline(

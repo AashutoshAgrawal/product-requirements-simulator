@@ -1,30 +1,30 @@
 """
-Gemini LLM Client Module
+OpenAI LLM Client Module
 
-This module provides a clean interface to interact with Google's Gemini API.
-It encapsulates all LLM-specific logic and configuration.
+This module provides a clean interface to interact with OpenAI's API.
+It encapsulates all LLM-specific logic and configuration for OpenAI models.
 """
 
 import time
 from typing import Optional, Dict, Any
-import google.generativeai as genai
+from openai import OpenAI
 
 from ..utils.logger import get_logger
-from config.api_keys import get_api_key  # GEMINI: Import Gemini API key getter
+from config.api_keys import get_openai_api_key
 from .base_client import BaseLLMClient
 
 logger = get_logger(__name__)
 
 
-class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
+class OpenAIClient(BaseLLMClient):
     """
-    A client for interacting with Google's Gemini API.
+    A client for interacting with OpenAI's API.
     
     This class handles API authentication, request management, and response handling
-    for Gemini language models.
+    for OpenAI language models.
     
     Attributes:
-        model_name (str): The name of the Gemini model to use
+        model_name (str): The name of the OpenAI model to use
         temperature (float): Controls randomness in generation (0.0 to 1.0)
         max_retries (int): Maximum number of retry attempts for failed requests
         retry_delay (int): Delay in seconds between retry attempts
@@ -32,24 +32,24 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
     
     def __init__(
         self,
-        model_name: str = "gemini-1.5-flash",
+        model_name: str = "gpt-4o-mini",
         temperature: float = 0.7,
         max_retries: int = 3,
         retry_delay: int = 2,
-        rate_limit_delay: float = 12.0
+        rate_limit_delay: float = 0.0
     ):
         """
-        Initialize the Gemini client.
+        Initialize the OpenAI client.
         
         Args:
-            model_name: Name of the Gemini model to use
+            model_name: Name of the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
             temperature: Sampling temperature (0.0 to 1.0)
             max_retries: Maximum number of retry attempts
             retry_delay: Delay between retries in seconds
             rate_limit_delay: Delay between requests to avoid rate limits (seconds)
             
         Raises:
-            ValueError: If GOOGLE_API_KEY is not set in environment
+            ValueError: If OPENAI_API_KEY is not set in environment
         """
         self.model_name = model_name
         self.temperature = temperature
@@ -58,19 +58,19 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
         self.rate_limit_delay = rate_limit_delay
         self.last_request_time = 0
         
-        # Configure API key  # GEMINI: Get Gemini API key
-        api_key = get_api_key()  # GEMINI: Retrieve Gemini API key from key manager
+        # Configure API key
+        api_key = get_openai_api_key()
         if not api_key:
             raise ValueError(
-                "No API keys available in config/api_keys.py. "
-                "Please add at least one API key to the API_KEYS list."
+                "No OpenAI API keys available in config/api_keys.py. "
+                "Please set OPENAI_API_KEY_1 or OPENAI_API_KEY in environment."
             )
         
-        genai.configure(api_key=api_key)  # GEMINI: Configure Gemini with API key
-        self.model = genai.GenerativeModel(model_name)  # GEMINI: Initialize Gemini model
+        self.client = OpenAI(api_key=api_key)
         
-        logger.info(f"Initialized GeminiClient with model: {model_name}")
-        logger.info(f"Rate limit protection: {rate_limit_delay}s delay between requests")
+        logger.info(f"Initialized OpenAIClient with model: {model_name}")
+        if rate_limit_delay > 0:
+            logger.info(f"Rate limit protection: {rate_limit_delay}s delay between requests")
     
     def run(
         self,
@@ -79,7 +79,7 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
         max_output_tokens: Optional[int] = None
     ) -> str:
         """
-        Execute a prompt using the Gemini API.
+        Execute a prompt using the OpenAI API.
         
         Args:
             prompt: The text prompt to send to the model
@@ -101,23 +101,23 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
             logger.debug(f"Rate limit protection: waiting {wait_time:.1f}s before next request")
             time.sleep(wait_time)
         
-        generation_config = {
+        # Prepare API parameters
+        params = {
+            "model": self.model_name,
+            "messages": [{"role": "user", "content": prompt}],
             "temperature": temperature if temperature is not None else self.temperature,
         }
         
         if max_output_tokens:
-            generation_config["max_output_tokens"] = max_output_tokens
+            params["max_tokens"] = max_output_tokens
         
         for attempt in range(self.max_retries):
             try:
-                logger.debug(f"Sending request to Gemini (attempt {attempt + 1}/{self.max_retries})")  # GEMINI: Logging Gemini request
+                logger.debug(f"Sending request to OpenAI (attempt {attempt + 1}/{self.max_retries})")
                 
-                response = self.model.generate_content(  # GEMINI: Call Gemini API
-                    prompt,
-                    generation_config=generation_config
-                )
+                response = self.client.chat.completions.create(**params)
                 
-                result = response.text
+                result = response.choices[0].message.content
                 self.last_request_time = time.time()  # Update last request time
                 logger.debug(f"Successfully received response ({len(result)} characters)")
                 return result
@@ -160,11 +160,10 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
             Dictionary containing model configuration details
         """
         return {
-            "provider": "gemini",  # GEMINI: Provider identifier
+            "provider": "openai",
             "model_name": self.model_name,
             "temperature": self.temperature,
             "max_retries": self.max_retries,
             "retry_delay": self.retry_delay,
             "rate_limit_delay": self.rate_limit_delay
         }
-
