@@ -22,6 +22,14 @@ function App() {
   const [interviews, setInterviews] = useState([]);
   const [needs, setNeeds] = useState([]);
   const [pollInterval, setPollInterval] = useState(null);
+  
+  // UI state for collapsible sections
+  const [expandedAgents, setExpandedAgents] = useState({});
+  const [expandedNeeds, setExpandedNeeds] = useState({});
+  const [viewMode, setViewMode] = useState('summary'); // 'summary' or 'details'
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterPriority, setFilterPriority] = useState('all');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -141,6 +149,47 @@ function App() {
       description: descMatch ? descMatch[1].trim() : agentText.substring(0, 150) + '...',
       full: agentText
     };
+  };
+
+  // Helper to truncate text
+  const truncateText = (text, maxLength) => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
+  // Helper to extract first sentence
+  const getFirstSentence = (text) => {
+    if (!text) return '';
+    const match = text.match(/^[^.!?]+[.!?]/);
+    return match ? match[0] : truncateText(text, 100);
+  };
+
+  // Filter needs based on search and filters
+  const filterNeeds = (needsList) => {
+    if (!needsList) return [];
+    return needsList.filter(need => {
+      const matchesSearch = !searchTerm || 
+        need.need_statement?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        need.evidence?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = filterCategory === 'all' || need.category === filterCategory;
+      const matchesPriority = filterPriority === 'all' || need.priority === filterPriority;
+      return matchesSearch && matchesCategory && matchesPriority;
+    });
+  };
+
+  // Get category colors
+  const getCategoryColor = (category) => {
+    const colors = {
+      'Accessibility': '#667eea',
+      'Functional': '#764ba2',
+      'Usability': '#f093fb',
+      'Safety': '#4facfe',
+      'Emotional': '#feca57',
+      'Social': '#48dbfb',
+      'Performance': '#ff6b6b'
+    };
+    return colors[category] || '#999';
   };
 
   const getStageInfo = (stage) => {
@@ -274,7 +323,7 @@ function App() {
                               <span className="agent-number">#{idx + 1}</span>
                               <h4>{parsed.name}</h4>
                             </div>
-                            <p className="agent-description">{parsed.description}</p>
+                            <p className="agent-description">{truncateText(parsed.description, 120)}</p>
                           </div>
                         );
                       })}
@@ -293,10 +342,7 @@ function App() {
                             <span className="experience-label">Agent {exp.agent_id}</span>
                           </div>
                           <div className="experience-content">
-                            {exp.experience.split('\n').slice(0, 5).map((line, i) => (
-                              line.trim() && <p key={i}>{line}</p>
-                            ))}
-                            {exp.experience.split('\n').length > 5 && <p className="more-text">...</p>}
+                            <p>{getFirstSentence(exp.experience)}</p>
                           </div>
                         </div>
                       ))}
@@ -315,10 +361,10 @@ function App() {
                             <span className="interview-label">Agent {interview.agent_id}</span>
                             <span className="qa-count">{interview.interview?.length || 0} Q&A pairs</span>
                           </div>
-                          {interview.interview && interview.interview.slice(0, 2).map((qa, qaIdx) => (
+                          {interview.interview && interview.interview.slice(0, 1).map((qa, qaIdx) => (
                             <div key={qaIdx} className="qa-pair">
                               <div className="question">❓ {qa.question}</div>
-                              <div className="answer">💭 {qa.answer.substring(0, 200)}...</div>
+                              <div className="answer">💭 {truncateText(qa.answer, 150)}</div>
                             </div>
                           ))}
                         </div>
@@ -363,45 +409,218 @@ function App() {
           <div className="results-container">
             <div className="results-header">
               <h2>✅ Analysis Complete</h2>
-              <button onClick={resetForm} className="btn-secondary">
-                ← New Analysis
-              </button>
+              <div className="results-header-actions">
+                <div className="view-mode-toggle">
+                  <button 
+                    className={viewMode === 'summary' ? 'active' : ''} 
+                    onClick={() => setViewMode('summary')}
+                  >
+                    📊 Summary
+                  </button>
+                  <button 
+                    className={viewMode === 'details' ? 'active' : ''} 
+                    onClick={() => setViewMode('details')}
+                  >
+                    📄 Details
+                  </button>
+                </div>
+                <button onClick={resetForm} className="btn-secondary">
+                  ← New Analysis
+                </button>
+              </div>
+            </div>
+
+            {/* Executive Summary Dashboard */}
+            <div className="executive-summary">
+              <div className="summary-grid">
+                <div className="summary-metric">
+                  <div className="metric-icon">👥</div>
+                  <div className="metric-value">{results.metadata.n_agents}</div>
+                  <div className="metric-label">Agent Personas</div>
+                </div>
+                <div className="summary-metric">
+                  <div className="metric-icon">🎯</div>
+                  <div className="metric-value">{results.aggregated_needs.total_needs}</div>
+                  <div className="metric-label">Total Needs</div>
+                </div>
+                <div className="summary-metric">
+                  <div className="metric-icon">🔴</div>
+                  <div className="metric-value">
+                    {Object.values(results.aggregated_needs.categories).flat().filter(n => n.priority === 'High').length}
+                  </div>
+                  <div className="metric-label">High Priority</div>
+                </div>
+                <div className="summary-metric">
+                  <div className="metric-icon">📂</div>
+                  <div className="metric-value">{Object.keys(results.aggregated_needs.categories).length}</div>
+                  <div className="metric-label">Categories</div>
+                </div>
+              </div>
+
+              {/* Key Highlights */}
+              <div className="key-highlights">
+                <h4>🌟 Key Highlights</h4>
+                <ul>
+                  <li>Product: <strong>{results.metadata.product}</strong> ({results.metadata.design_context})</li>
+                  <li>Most common category: <strong>
+                    {Object.entries(results.aggregated_needs.categories)
+                      .sort((a, b) => b[1].length - a[1].length)[0]?.[0]}</strong> ({Object.entries(results.aggregated_needs.categories)
+                      .sort((a, b) => b[1].length - a[1].length)[0]?.[1].length} needs)
+                  </li>
+                  <li>Analyzed through {results.metadata.n_agents} diverse user persona{results.metadata.n_agents > 1 ? 's' : ''}</li>
+                </ul>
+              </div>
+
+              {/* Needs by Category Chart */}
+              <div className="category-chart">
+                <h4>📊 Needs Distribution</h4>
+                <div className="chart-bars">
+                  {Object.entries(results.aggregated_needs.categories)
+                    .sort((a, b) => b[1].length - a[1].length)
+                    .map(([category, needs]) => (
+                      <div key={category} className="chart-bar-item">
+                        <div className="chart-label">{category}</div>
+                        <div className="chart-bar-container">
+                          <div 
+                            className="chart-bar"
+                            style={{ 
+                              width: `${(needs.length / results.aggregated_needs.total_needs) * 100}%`,
+                              backgroundColor: getCategoryColor(category)
+                            }}
+                          >
+                            <span className="chart-value">{needs.length}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
             </div>
 
             <div className="results-summary">
               <div className="summary-card">
-                <h3>📊 Summary</h3>
+                <h3>📋 Analysis Details</h3>
                 <p><strong>Product:</strong> {results.metadata.product}</p>
                 <p><strong>Context:</strong> {results.metadata.design_context}</p>
-                <p><strong>Agents:</strong> {results.metadata.n_agents}</p>
-                <p><strong>Total Needs:</strong> {results.aggregated_needs.total_needs}</p>
+                <p><strong>Completed:</strong> {new Date().toLocaleDateString()}</p>
               </div>
             </div>
 
             <div className="results-section">
               <h3>👥 Agent Personas ({results.agents.length})</h3>
-              {results.agents.map((agent, idx) => (
-                <div key={idx} className="card">
-                  <div dangerouslySetInnerHTML={{ __html: agent.replace(/\n/g, '<br/>') }} />
-                </div>
-              ))}
+              <div className="agents-grid">
+                {results.agents.map((agent, idx) => {
+                  const parsed = parseAgent(agent);
+                  const isExpanded = expandedAgents[idx];
+                  return (
+                    <div key={idx} className="agent-card collapsible">
+                      <div className="agent-header" onClick={() => setExpandedAgents({...expandedAgents, [idx]: !isExpanded})}>
+                        <div>
+                          <span className="agent-number">#{idx + 1}</span>
+                          <h4>{parsed.name}</h4>
+                        </div>
+                        <button className="expand-btn">{isExpanded ? '▼' : '▶'}</button>
+                      </div>
+                      <p className="agent-description-short">{parsed.description}</p>
+                      {isExpanded && viewMode === 'details' && (
+                        <div className="agent-details">
+                          <div className="details-content" dangerouslySetInnerHTML={{ __html: parsed.full.replace(/\n/g, '<br/>') }} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="results-section">
-              <h3>🎯 Extracted Needs</h3>
-              {Object.entries(results.aggregated_needs.categories).map(([category, needs]) => (
-                <div key={category} className="category-section">
-                  <h4>{category} ({needs.length})</h4>
-                  {needs.map((need, idx) => (
-                    <div key={idx} className="need-card">
-                      <div className="need-priority">{need.priority} Priority</div>
-                      <p className="need-statement"><strong>{need.need_statement}</strong></p>
-                      <p className="need-evidence"><em>Evidence:</em> {need.evidence.substring(0, 200)}...</p>
-                      <p className="need-implication"><em>Design Implication:</em> {need.design_implication}</p>
-                    </div>
-                  ))}
+              <div className="needs-header">
+                <h3>🎯 Extracted Needs ({results.aggregated_needs.total_needs})</h3>
+                
+                {/* Search and Filter Controls */}
+                <div className="needs-controls">
+                  <input
+                    type="text"
+                    placeholder="🔍 Search needs..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="search-input"
+                  />
+                  <select 
+                    value={filterCategory} 
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                    className="filter-select"
+                  >
+                    <option value="all">All Categories</option>
+                    {Object.keys(results.aggregated_needs.categories).map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <select 
+                    value={filterPriority} 
+                    onChange={(e) => setFilterPriority(e.target.value)}
+                    className="filter-select"
+                  >
+                    <option value="all">All Priorities</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
                 </div>
-              ))}
+              </div>
+
+              {Object.entries(results.aggregated_needs.categories).map(([category, categoryNeeds]) => {
+                const filteredNeeds = filterNeeds(categoryNeeds);
+                if (filteredNeeds.length === 0) return null;
+
+                return (
+                  <div key={category} className="category-section">
+                    <h4>
+                      <span className={`category-badge category-${category.toLowerCase()}`}>
+                        {category}
+                      </span>
+                      ({filteredNeeds.length})
+                    </h4>
+                    <div className="needs-grid">
+                      {filteredNeeds.map((need, idx) => {
+                        const needKey = `${category}-${idx}`;
+                        const isExpanded = expandedNeeds[needKey];
+                        
+                        return (
+                          <div key={idx} className="need-card collapsible">
+                            <div className="need-header">
+                              <span className={`priority-badge priority-${need.priority?.toLowerCase()}`}>
+                                {need.priority}
+                              </span>
+                              <button 
+                                className="expand-btn-small" 
+                                onClick={() => setExpandedNeeds({...expandedNeeds, [needKey]: !isExpanded})}
+                              >
+                                {isExpanded ? '▼' : '▶'}
+                              </button>
+                            </div>
+                            <p className="need-statement"><strong>{need.need_statement}</strong></p>
+                            <p className="need-evidence">
+                              <em>Evidence:</em> {truncateText(need.evidence, 100)}
+                            </p>
+                            
+                            {isExpanded && viewMode === 'details' && (
+                              <div className="need-details">
+                                <p className="need-evidence-full">
+                                  <em>Full Evidence:</em> {need.evidence}
+                                </p>
+                                <p className="need-implication">
+                                  <em>Design Implication:</em> {need.design_implication}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="results-actions">
