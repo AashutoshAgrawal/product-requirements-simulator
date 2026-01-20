@@ -22,7 +22,7 @@ function App() {
   const [interviews, setInterviews] = useState([]);
   const [needs, setNeeds] = useState([]);
   const [pollInterval, setPollInterval] = useState(null);
-  
+
   // UI state for collapsible sections
   const [expandedAgents, setExpandedAgents] = useState({});
   const [expandedNeeds, setExpandedNeeds] = useState({});
@@ -30,6 +30,11 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
+
+  // Editing state
+  const [editingItem, setEditingItem] = useState(null); // {type: 'agent'|'experience'|'interview'|'need', id: string, field: string}
+  const [editValue, setEditValue] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -121,6 +126,65 @@ function App() {
     }
   };
 
+  // Handle editing
+  const startEdit = (type, id, field, currentValue) => {
+    setEditingItem({ type, id, field });
+    setEditValue(currentValue || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingItem(null);
+    setEditValue('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingItem || !results) return;
+
+    try {
+      // Update local state immediately for better UX
+      const updatedResults = { ...results };
+
+      if (editingItem.type === 'agent') {
+        const agentIdx = parseInt(editingItem.id);
+        if (editingItem.field === 'description') {
+          updatedResults.agents[agentIdx] = updatedResults.agents[agentIdx].replace(
+            /(\*\*Description\*\*:\s*)(.+?)(?:\n|$)/,
+            `$1${editValue}`
+          );
+        }
+      } else if (editingItem.type === 'need') {
+        const [category, idx] = editingItem.id.split('-');
+        const needIdx = parseInt(idx);
+        const categoryNeeds = updatedResults.aggregated_needs.categories[category];
+        if (categoryNeeds && categoryNeeds[needIdx]) {
+          categoryNeeds[needIdx][editingItem.field] = editValue;
+        }
+      }
+
+      setResults(updatedResults);
+
+      // Save to backend if jobId is available
+      if (jobId) {
+        try {
+          await axios.post(`${API_BASE_URL}/api/edit/${jobId}`, {
+            type: editingItem.type,
+            id: editingItem.id,
+            field: editingItem.field,
+            content: editValue
+          });
+        } catch (backendErr) {
+          // Silently fail - local edit is already applied
+          console.warn('Failed to save edit to backend:', backendErr);
+        }
+      }
+
+      setEditingItem(null);
+      setEditValue('');
+    } catch (err) {
+      setError('Failed to save edit');
+    }
+  };
+
   const resetForm = () => {
     setProduct('');
     setDesignContext('');
@@ -134,6 +198,8 @@ function App() {
     setExperiences([]);
     setInterviews([]);
     setNeeds([]);
+    setEditingItem(null);
+    setEditValue('');
     if (pollInterval) {
       clearInterval(pollInterval);
       setPollInterval(null);
@@ -146,30 +212,23 @@ function App() {
     const descMatch = agentText.match(/\*\*Description\*\*:\s*(.+?)(?:\n|$)/);
     return {
       name: nameMatch ? nameMatch[1].trim() : 'Agent',
-      description: descMatch ? descMatch[1].trim() : agentText.substring(0, 150) + '...',
+      description: descMatch ? descMatch[1].trim() : agentText,
       full: agentText
     };
-  };
-
-  // Helper to truncate text
-  const truncateText = (text, maxLength) => {
-    if (!text) return '';
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
   };
 
   // Helper to extract first sentence
   const getFirstSentence = (text) => {
     if (!text) return '';
     const match = text.match(/^[^.!?]+[.!?]/);
-    return match ? match[0] : truncateText(text, 100);
+    return match ? match[0] : text;
   };
 
   // Filter needs based on search and filters
   const filterNeeds = (needsList) => {
     if (!needsList) return [];
     return needsList.filter(need => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         need.need_statement?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         need.evidence?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = filterCategory === 'all' || need.category === filterCategory;
@@ -216,7 +275,13 @@ function App() {
               <div className="form-container">
                 <form onSubmit={handleSubmit}>
                   <div className="form-group">
-                    <label htmlFor="product">Product Name *</label>
+                    <label htmlFor="product">
+                      Product Name *
+                      <span
+                        className="help-icon"
+                        title="Enter the name or type of product you want to analyze. Examples: camping tent, smartphone, office chair, fitness app"
+                      >❓</span>
+                    </label>
                     <input
                       id="product"
                       type="text"
@@ -229,7 +294,13 @@ function App() {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="designContext">Design Context *</label>
+                    <label htmlFor="designContext">
+                      Design Context *
+                      <span
+                        className="help-icon"
+                        title="Describe the specific use case, environment, or scenario for your product. This helps generate more relevant user personas. Examples: ultralight backpacking in alpine conditions, daily commute in urban areas, remote work from home"
+                      >❓</span>
+                    </label>
                     <textarea
                       id="designContext"
                       value={designContext}
@@ -242,7 +313,13 @@ function App() {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="nAgents">Number of Agent Personas: {nAgents}</label>
+                    <label htmlFor="nAgents">
+                      Number of Agent Personas: {nAgents}
+                      <span
+                        className="help-icon"
+                        title="Select how many diverse user personas to generate (1-5). More personas provide broader perspectives but take longer. Start with 1-2 for faster results, use 3-5 for comprehensive analysis."
+                      >❓</span>
+                    </label>
                     <div className="slider-container">
                       <input
                         id="nAgents"
@@ -292,10 +369,23 @@ function App() {
                     const isActive = progress?.stage_number === stageNum;
                     const isCompleted = progress?.stage_number > stageNum || (progress?.stage === stageKey && progress?.completed);
 
+                    const stageDescriptions = {
+                      1: 'AI generates diverse user personas with different backgrounds and needs',
+                      2: 'Each agent simulates using the product in realistic scenarios',
+                      3: 'Agents are interviewed about their experiences to uncover insights',
+                      4: 'AI extracts and categorizes underlying user needs from interviews'
+                    };
+
                     return (
                       <div key={stageNum} className={`stage-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}>
                         <div className="stage-icon">{stageInfo.icon}</div>
-                        <div className="stage-label">{stageInfo.name}</div>
+                        <div className="stage-label">
+                          {stageInfo.name}
+                          <span
+                            className="help-icon-small"
+                            title={stageDescriptions[stageNum]}
+                          >❓</span>
+                        </div>
                         {isActive && <div className="stage-pulse"></div>}
                       </div>
                     );
@@ -323,7 +413,7 @@ function App() {
                               <span className="agent-number">#{idx + 1}</span>
                               <h4>{parsed.name}</h4>
                             </div>
-                            <p className="agent-description">{truncateText(parsed.description, 120)}</p>
+                            <p className="agent-description">{parsed.description}</p>
                           </div>
                         );
                       })}
@@ -364,7 +454,7 @@ function App() {
                           {interview.interview && interview.interview.slice(0, 1).map((qa, qaIdx) => (
                             <div key={qaIdx} className="qa-pair">
                               <div className="question">❓ {qa.question}</div>
-                              <div className="answer">💭 {truncateText(qa.answer, 150)}</div>
+                              <div className="answer">💭 {qa.answer}</div>
                             </div>
                           ))}
                         </div>
@@ -411,14 +501,14 @@ function App() {
               <h2>✅ Analysis Complete</h2>
               <div className="results-header-actions">
                 <div className="view-mode-toggle">
-                  <button 
-                    className={viewMode === 'summary' ? 'active' : ''} 
+                  <button
+                    className={viewMode === 'summary' ? 'active' : ''}
                     onClick={() => setViewMode('summary')}
                   >
                     📊 Summary
                   </button>
-                  <button 
-                    className={viewMode === 'details' ? 'active' : ''} 
+                  <button
+                    className={viewMode === 'details' ? 'active' : ''}
                     onClick={() => setViewMode('details')}
                   >
                     📄 Details
@@ -465,7 +555,7 @@ function App() {
                   <li>Most common category: <strong>
                     {Object.entries(results.aggregated_needs.categories)
                       .sort((a, b) => b[1].length - a[1].length)[0]?.[0]}</strong> ({Object.entries(results.aggregated_needs.categories)
-                      .sort((a, b) => b[1].length - a[1].length)[0]?.[1].length} needs)
+                        .sort((a, b) => b[1].length - a[1].length)[0]?.[1].length} needs)
                   </li>
                   <li>Analyzed through {results.metadata.n_agents} diverse user persona{results.metadata.n_agents > 1 ? 's' : ''}</li>
                 </ul>
@@ -481,9 +571,9 @@ function App() {
                       <div key={category} className="chart-bar-item">
                         <div className="chart-label">{category}</div>
                         <div className="chart-bar-container">
-                          <div 
+                          <div
                             className="chart-bar"
-                            style={{ 
+                            style={{
                               width: `${(needs.length / results.aggregated_needs.total_needs) * 100}%`,
                               backgroundColor: getCategoryColor(category)
                             }}
@@ -514,14 +604,39 @@ function App() {
                   const isExpanded = expandedAgents[idx];
                   return (
                     <div key={idx} className="agent-card collapsible">
-                      <div className="agent-header" onClick={() => setExpandedAgents({...expandedAgents, [idx]: !isExpanded})}>
-                        <div>
+                      <div className="agent-header">
+                        <div onClick={() => setExpandedAgents({ ...expandedAgents, [idx]: !isExpanded })} style={{ flex: 1, cursor: 'pointer' }}>
                           <span className="agent-number">#{idx + 1}</span>
                           <h4>{parsed.name}</h4>
                         </div>
-                        <button className="expand-btn">{isExpanded ? '▼' : '▶'}</button>
+                        <div className="card-actions">
+                          <button
+                            className="edit-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEdit('agent', idx.toString(), 'description', parsed.description);
+                            }}
+                            title="Edit agent description"
+                          >✏️</button>
+                          <button className="expand-btn" onClick={() => setExpandedAgents({ ...expandedAgents, [idx]: !isExpanded })}>{isExpanded ? '▼' : '▶'}</button>
+                        </div>
                       </div>
-                      <p className="agent-description-short">{parsed.description}</p>
+                      {editingItem && editingItem.type === 'agent' && editingItem.id === idx.toString() && editingItem.field === 'description' ? (
+                        <div className="edit-mode">
+                          <textarea
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            rows="3"
+                            className="edit-textarea"
+                          />
+                          <div className="edit-actions">
+                            <button onClick={saveEdit} className="save-btn">Save</button>
+                            <button onClick={cancelEdit} className="cancel-btn">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="agent-description-short">{parsed.description}</p>
+                      )}
                       {isExpanded && viewMode === 'details' && (
                         <div className="agent-details">
                           <div className="details-content" dangerouslySetInnerHTML={{ __html: parsed.full.replace(/\n/g, '<br/>') }} />
@@ -536,7 +651,7 @@ function App() {
             <div className="results-section">
               <div className="needs-header">
                 <h3>🎯 Extracted Needs ({results.aggregated_needs.total_needs})</h3>
-                
+
                 {/* Search and Filter Controls */}
                 <div className="needs-controls">
                   <input
@@ -546,8 +661,8 @@ function App() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="search-input"
                   />
-                  <select 
-                    value={filterCategory} 
+                  <select
+                    value={filterCategory}
                     onChange={(e) => setFilterCategory(e.target.value)}
                     className="filter-select"
                   >
@@ -556,8 +671,8 @@ function App() {
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
-                  <select 
-                    value={filterPriority} 
+                  <select
+                    value={filterPriority}
                     onChange={(e) => setFilterPriority(e.target.value)}
                     className="filter-select"
                   >
@@ -585,25 +700,85 @@ function App() {
                       {filteredNeeds.map((need, idx) => {
                         const needKey = `${category}-${idx}`;
                         const isExpanded = expandedNeeds[needKey];
-                        
+
+                        const isEditingNeed = editingItem && editingItem.type === 'need' && editingItem.id === needKey;
+                        const isEditingStatement = isEditingNeed && editingItem.field === 'need_statement';
+                        const isEditingEvidence = isEditingNeed && editingItem.field === 'evidence';
+
                         return (
                           <div key={idx} className="need-card collapsible">
                             <div className="need-header">
                               <span className={`priority-badge priority-${need.priority?.toLowerCase()}`}>
                                 {need.priority}
                               </span>
-                              <button 
-                                className="expand-btn-small" 
-                                onClick={() => setExpandedNeeds({...expandedNeeds, [needKey]: !isExpanded})}
-                              >
-                                {isExpanded ? '▼' : '▶'}
-                              </button>
+                              <div className="card-actions">
+                                <button
+                                  className="edit-btn-small"
+                                  onClick={() => startEdit('need', needKey, 'need_statement', need.need_statement)}
+                                  title="Edit need statement"
+                                >✏️</button>
+                                <button
+                                  className="expand-btn-small"
+                                  onClick={() => setExpandedNeeds({ ...expandedNeeds, [needKey]: !isExpanded })}
+                                >
+                                  {isExpanded ? '▼' : '▶'}
+                                </button>
+                              </div>
                             </div>
-                            <p className="need-statement"><strong>{need.need_statement}</strong></p>
-                            <p className="need-evidence">
-                              <em>Evidence:</em> {truncateText(need.evidence, 100)}
-                            </p>
-                            
+                            {isEditingStatement ? (
+                              <div className="edit-mode">
+                                <textarea
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  rows="2"
+                                  className="edit-textarea"
+                                />
+                                <div className="edit-actions">
+                                  <button onClick={saveEdit} className="save-btn">Save</button>
+                                  <button onClick={cancelEdit} className="cancel-btn">Cancel</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="need-statement"><strong>{need.need_statement}</strong></p>
+                            )}
+                            <div className="need-evidence-section">
+                              {isEditingEvidence ? (
+                                <div className="edit-mode">
+                                  <textarea
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    rows="2"
+                                    className="edit-textarea"
+                                  />
+                                  <div className="edit-actions">
+                                    <button onClick={saveEdit} className="save-btn">Save</button>
+                                    <button onClick={cancelEdit} className="cancel-btn">Cancel</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="need-evidence">
+                                    <em>Evidence:</em> {need.evidence}
+                                    <button
+                                      className="edit-btn-inline"
+                                      onClick={() => startEdit('need', needKey, 'evidence', need.evidence)}
+                                      title="Edit evidence"
+                                    >✏️</button>
+                                  </p>
+                                  {need.agent_id && (
+                                    <p className="evidence-source">
+                                      <em>Source:</em> Agent {need.agent_id}
+                                      {need.question && (
+                                        <span className="source-question" title={need.question}>
+                                          {' '}(from interview)
+                                        </span>
+                                      )}
+                                    </p>
+                                  )}
+                                </>
+                              )}
+                            </div>
+
                             {isExpanded && viewMode === 'details' && (
                               <div className="need-details">
                                 <p className="need-evidence-full">
@@ -612,6 +787,11 @@ function App() {
                                 <p className="need-implication">
                                   <em>Design Implication:</em> {need.design_implication}
                                 </p>
+                                {need.question && (
+                                  <p className="source-question-full">
+                                    <em>Interview Question:</em> {need.question}
+                                  </p>
+                                )}
                               </div>
                             )}
                           </div>

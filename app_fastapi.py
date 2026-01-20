@@ -12,6 +12,7 @@ import os
 import json
 import uuid
 import asyncio
+import re
 from datetime import datetime
 from typing import Dict, Optional, List
 from pathlib import Path
@@ -409,6 +410,73 @@ async def get_results(job_id: str):
         status=job["status"],
         results=job.get("results")
     )
+
+
+class EditRequest(BaseModel):
+    type: str = Field(..., description="Type of item: 'agent', 'experience', 'interview', or 'need'")
+    id: str = Field(..., description="ID of the item to edit")
+    field: str = Field(..., description="Field name to edit")
+    content: str = Field(..., description="New content value")
+
+
+@app.post("/api/edit/{job_id}")
+async def edit_item(job_id: str, edit_request: EditRequest):
+    """
+    Edit an item in the results (agent, experience, interview, or need).
+    Updates are stored in the job results.
+    """
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    job = jobs[job_id]
+    
+    if job["status"] not in ["completed", "processing"]:
+        raise HTTPException(status_code=400, detail=f"Cannot edit. Job status: {job['status']}")
+    
+    # Initialize edits if not exists
+    if "edits" not in job:
+        job["edits"] = {}
+    
+    # Store the edit
+    edit_key = f"{edit_request.type}_{edit_request.id}_{edit_request.field}"
+    job["edits"][edit_key] = {
+        "type": edit_request.type,
+        "id": edit_request.id,
+        "field": edit_request.field,
+        "content": edit_request.content,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # Apply edit to results if available
+    if job.get("results"):
+        results = job["results"]
+        
+        if edit_request.type == "agent":
+            agent_idx = int(edit_request.id)
+            if agent_idx < len(results.get("agents", [])):
+                if edit_request.field == "description":
+                    agent_text = results["agents"][agent_idx]
+                    results["agents"][agent_idx] = re.sub(
+                        r"(\*\*Description\*\*:\s*)(.+?)(?:\n|$)",
+                        f"\\1{edit_request.content}",
+                        agent_text,
+                        flags=re.DOTALL
+                    )
+        
+        elif edit_request.type == "need":
+            # Parse category and index from id (format: "category-index")
+            parts = edit_request.id.split("-")
+            if len(parts) >= 2:
+                category = parts[0]
+                need_idx = int(parts[1])
+                if category in results.get("aggregated_needs", {}).get("categories", {}):
+                    category_needs = results["aggregated_needs"]["categories"][category]
+                    if need_idx < len(category_needs):
+                        category_needs[need_idx][edit_request.field] = edit_request.content
+    
+    logger.info(f"Job {job_id}: Edited {edit_request.type} {edit_request.id} field {edit_request.field}")
+    
+    return {"status": "success", "message": "Edit saved successfully"}
 
 
 @app.get("/api/jobs")
