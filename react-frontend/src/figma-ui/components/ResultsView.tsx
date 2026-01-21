@@ -21,6 +21,7 @@ import {
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { AnalyticsView } from './AnalyticsView';
+import { NeedCard } from './NeedCard';
 
 interface ResultsViewProps {
   data: ProgressData;
@@ -288,7 +289,7 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
               {/* Needs List */}
               <div className="space-y-4">
                 {filteredNeeds.map((need, idx) => (
-                  <NeedDetailCard key={idx} need={need} />
+                  <NeedCard key={idx} need={need} index={idx} />
                 ))}
                 {filteredNeeds.length === 0 && (
                   <Card className="border-dashed">
@@ -333,56 +334,7 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
   );
 }
 
-// Detail card components
-function NeedDetailCard({ need }: { need: Need }) {
-  const categoryColors: Record<Need['category'], string> = {
-    Functional: 'bg-blue-100 text-blue-800',
-    Usability: 'bg-green-100 text-green-800',
-    Performance: 'bg-purple-100 text-purple-800',
-    Safety: 'bg-red-100 text-red-800',
-    Emotional: 'bg-pink-100 text-pink-800',
-    Social: 'bg-yellow-100 text-yellow-800',
-    Accessibility: 'bg-indigo-100 text-indigo-800',
-  };
-
-  const priorityColors: Record<Need['priority'], string> = {
-    High: 'bg-red-100 text-red-800',
-    Medium: 'bg-orange-100 text-orange-800',
-    Low: 'bg-gray-100 text-gray-800',
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex-1">
-            <div className="flex gap-2 mb-3">
-              <Badge className={categoryColors[need.category]} variant="secondary">
-                {need.category}
-              </Badge>
-              <Badge className={priorityColors[need.priority]} variant="secondary">
-                {need.priority} Priority
-              </Badge>
-            </div>
-            <CardTitle className="text-base">{need.need_statement}</CardTitle>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <p className="text-sm mb-2">Evidence:</p>
-          <p className="text-sm text-muted-foreground italic border-l-2 border-primary/30 pl-3">
-            {need.evidence}
-          </p>
-        </div>
-        <div>
-          <p className="text-sm mb-2">Design Implication:</p>
-          <p className="text-sm text-foreground/90">{need.design_implication}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// Detail card components (NeedDetailCard removed - using NeedCard instead)
 
 function AgentDetailCard({ agent }: { agent: Agent }) {
   return (

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Need } from '../lib/api';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface NeedCardProps {
@@ -26,6 +26,10 @@ const priorityColors: Record<Need['priority'], string> = {
   Low: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
 };
 
+const getPriorityLabel = (priority: Need['priority']): string => {
+  return `${priority} Priority`;
+};
+
 export function NeedCard({ need, index }: NeedCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -46,7 +50,7 @@ export function NeedCard({ need, index }: NeedCardProps) {
                 {need.category}
               </Badge>
               <Badge className={`text-xs ${priorityColors[need.priority]}`} variant="secondary">
-                {need.priority}
+                {getPriorityLabel(need.priority)}
               </Badge>
             </div>
             {isExpanded ? (
@@ -57,28 +61,30 @@ export function NeedCard({ need, index }: NeedCardProps) {
           </div>
           <p className="text-sm font-medium">{need.need_statement}</p>
           
-          {isExpanded && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="space-y-3 pt-2 border-t"
-            >
-              {need.evidence && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Evidence</p>
-                  <p className="text-xs text-foreground/80">{need.evidence}</p>
-                </div>
-              )}
-              {need.design_implication && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Design Implications</p>
-                  <p className="text-xs text-foreground/80">{need.design_implication}</p>
-                </div>
-              )}
-            </motion.div>
-          )}
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-3 pt-2 border-t overflow-hidden"
+              >
+                {need.evidence && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Evidence:</p>
+                    <p className="text-xs text-foreground/80 italic">{need.evidence}</p>
+                  </div>
+                )}
+                {need.design_implication && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Design Implication:</p>
+                    <p className="text-xs text-foreground/80">{need.design_implication}</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </CardContent>
       </Card>
     </motion.div>
