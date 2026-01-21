@@ -5,7 +5,7 @@ This module analyzes interview responses to extract and classify
 latent user needs according to structured criteria.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 
 from ..llm.gemini_client import GeminiClient
@@ -57,7 +57,8 @@ class LatentNeedExtractor:
         self,
         agent: str,
         question: str,
-        answer: str
+        answer: str,
+        agent_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Extract latent needs from a single Q&A pair.
@@ -66,6 +67,7 @@ class LatentNeedExtractor:
             agent: The agent description/persona
             question: The interview question
             answer: The agent's answer
+            agent_id: Optional agent ID for analytics tracking
             
         Returns:
             Dictionary containing extracted needs and metadata
@@ -78,7 +80,7 @@ class LatentNeedExtractor:
             answer=answer
         )
         
-        response = self.llm_client.run(prompt)
+        response = self.llm_client.run(prompt, _stage="need_extraction", _agent_id=str(agent_id) if agent_id is not None else None)
         
         # Parse JSON response
         needs_data = safe_parse_json(response)
@@ -106,6 +108,7 @@ class LatentNeedExtractor:
         logger.info("Extracting needs from full interview")
         
         agent = interview_data["agent"]
+        agent_id = interview_data.get("agent_id")
         qa_pairs = interview_data["interview"]
         
         all_needs = []
@@ -116,7 +119,8 @@ class LatentNeedExtractor:
             needs_result = self.extract_needs(
                 agent=agent,
                 question=qa["question"],
-                answer=qa["answer"]
+                answer=qa["answer"],
+                agent_id=agent_id
             )
             
             # Add metadata

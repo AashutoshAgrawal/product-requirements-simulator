@@ -20,7 +20,7 @@ export function ExperienceCard({ experience, index }: ExperienceCardProps) {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            <CardTitle className="text-sm">Agent {experience.agent_id + 1} Experience</CardTitle>
+            <CardTitle className="text-sm">Agent {experience.agent_id} Experience</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">

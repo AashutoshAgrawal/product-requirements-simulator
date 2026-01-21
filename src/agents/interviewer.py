@@ -74,7 +74,8 @@ class Interviewer:
         agent: str,
         experience: str,
         question: str,
-        product: str = "tent"
+        product: str = "tent",
+        agent_id: Optional[int] = None
     ) -> str:
         """
         Ask a single question to an agent about their experience.
@@ -84,6 +85,7 @@ class Interviewer:
             experience: The agent's simulated experience
             question: The question to ask
             product: The product being discussed
+            agent_id: Optional agent ID for analytics tracking
             
         Returns:
             The agent's answer to the question
@@ -97,7 +99,7 @@ class Interviewer:
             product=product
         )
         
-        answer = self.llm_client.run(prompt)
+        answer = self.llm_client.run(prompt, _stage="interviews", _agent_id=str(agent_id) if agent_id is not None else None)
         logger.debug("Received answer from agent")
         
         return answer
@@ -106,7 +108,8 @@ class Interviewer:
         self,
         agent: str,
         experience: str,
-        product: str = "tent"
+        product: str = "tent",
+        agent_id: Optional[int] = None
     ) -> List[Dict[str, str]]:
         """
         Conduct a full interview with all configured questions.
@@ -115,6 +118,7 @@ class Interviewer:
             agent: The agent description/persona
             experience: The agent's simulated experience
             product: The product being discussed
+            agent_id: Optional agent ID for analytics tracking
             
         Returns:
             List of Q&A dictionaries
@@ -126,7 +130,7 @@ class Interviewer:
         for idx, question in enumerate(self.questions, 1):
             logger.debug(f"Processing question {idx}/{len(self.questions)}")
             
-            answer = self.ask_question(agent, experience, question, product)
+            answer = self.ask_question(agent, experience, question, product, agent_id=agent_id)
             
             qa_pairs.append({
                 "question": question,
@@ -157,14 +161,16 @@ class Interviewer:
         for idx, exp_data in enumerate(experiences, 1):
             logger.debug(f"Interviewing agent {idx}/{len(experiences)}")
             
+            agent_id = exp_data.get("agent_id", idx-1)
             qa_pairs = self.conduct_interview(
                 agent=exp_data["agent"],
                 experience=exp_data["experience"],
-                product=exp_data.get("product", "tent")
+                product=exp_data.get("product", "tent"),
+                agent_id=agent_id
             )
             
             results.append({
-                "agent_id": exp_data.get("agent_id", idx),
+                "agent_id": agent_id,
                 "agent": exp_data["agent"],
                 "experience": exp_data["experience"],
                 "product": exp_data.get("product", "tent"),

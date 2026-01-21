@@ -36,7 +36,8 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
         temperature: float = 0.7,
         max_retries: int = 3,
         retry_delay: int = 2,
-        rate_limit_delay: float = 12.0
+        rate_limit_delay: float = 12.0,
+        analytics_collector=None
     ):
         """
         Initialize the Gemini client.
@@ -47,6 +48,7 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
             max_retries: Maximum number of retry attempts
             retry_delay: Delay between retries in seconds
             rate_limit_delay: Delay between requests to avoid rate limits (seconds)
+            analytics_collector: Optional AnalyticsCollector instance for tracking metrics
             
         Raises:
             ValueError: If GOOGLE_API_KEY is not set in environment
@@ -57,6 +59,8 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
         self.retry_delay = retry_delay
         self.rate_limit_delay = rate_limit_delay
         self.last_request_time = 0
+        self.analytics_collector = analytics_collector
+        self._call_counter = 0
         
         # Configure API key  # GEMINI: Get Gemini API key
         api_key = get_api_key()  # GEMINI: Retrieve Gemini API key from key manager
@@ -76,7 +80,9 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
         self,
         prompt: str,
         temperature: Optional[float] = None,
-        max_output_tokens: Optional[int] = None
+        max_output_tokens: Optional[int] = None,
+        _stage: str = "unknown",
+        _agent_id: Optional[str] = None
     ) -> str:
         """
         Execute a prompt using the Gemini API.
@@ -85,6 +91,8 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
             prompt: The text prompt to send to the model
             temperature: Optional override for the default temperature
             max_output_tokens: Optional maximum number of tokens to generate
+            _stage: Stage name for analytics tracking (internal use)
+            _agent_id: Agent ID for analytics tracking (internal use)
             
         Returns:
             The generated text response from the model
@@ -112,18 +120,56 @@ class GeminiClient(BaseLLMClient):  # GEMINI: Gemini client implementation
             try:
                 logger.debug(f"Sending request to Gemini (attempt {attempt + 1}/{self.max_retries})")  # GEMINI: Logging Gemini request
                 
+                start_time = time.time()
                 response = self.model.generate_content(  # GEMINI: Call Gemini API
                     prompt,
                     generation_config=generation_config
                 )
+                end_time = time.time()
                 
                 result = response.text
-                self.last_request_time = time.time()  # Update last request time
+                self.last_request_time = end_time  # Update last request time
                 logger.debug(f"Successfully received response ({len(result)} characters)")
+                
+                # Track analytics if collector is available
+                if self.analytics_collector:
+                    self._call_counter += 1
+                    # Gemini token usage from usage_metadata
+                    input_tokens = response.usage_metadata.prompt_token_count if hasattr(response, 'usage_metadata') else 0
+                    output_tokens = response.usage_metadata.candidates_token_count if hasattr(response, 'usage_metadata') else 0
+                    
+                    self.analytics_collector.track_api_call(
+                        call_id=f"gemini_{self._call_counter}",
+                        stage=_stage,
+                        agent_id=_agent_id,
+                        start_time=start_time,
+                        end_time=end_time,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        model=self.model_name,
+                        status="success",
+                        retry_count=attempt
+                    )
+                
                 return result
                 
             except Exception as e:
                 logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
+                
+                # Track failed attempt
+                if self.analytics_collector and attempt == self.max_retries - 1:
+                    self._call_counter += 1
+                    self.analytics_collector.track_api_call(
+                        call_id=f"gemini_{self._call_counter}",
+                        stage=_stage,
+                        agent_id=_agent_id,
+                        start_time=time.time(),
+                        end_time=time.time(),
+                        model=self.model_name,
+                        status="error",
+                        error=str(e),
+                        retry_count=attempt
+                    )
                 
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)

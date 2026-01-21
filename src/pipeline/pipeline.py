@@ -18,6 +18,7 @@ from ..agents.simulator import ExperienceSimulator
 from ..agents.interviewer import Interviewer
 from ..agents.latent_extractor import LatentNeedExtractor
 from ..utils.logger import get_logger
+from ..utils.analytics import AnalyticsCollector
 
 logger = get_logger(__name__)
 
@@ -40,7 +41,8 @@ class RequirementsPipeline:
     def __init__(
         self,
         llm_client: GeminiClient,
-        interview_questions: Optional[List[str]] = None
+        interview_questions: Optional[List[str]] = None,
+        analytics_collector: Optional[AnalyticsCollector] = None
     ):
         """
         Initialize the requirements pipeline.
@@ -48,8 +50,10 @@ class RequirementsPipeline:
         Args:
             llm_client: An initialized Gemini client instance
             interview_questions: Optional list of questions for interviews
+            analytics_collector: Optional AnalyticsCollector for metrics tracking
         """
         self.llm_client = llm_client
+        self.analytics = analytics_collector or AnalyticsCollector()
         
         # Initialize all components
         self.agent_generator = AgentGenerator(llm_client)
@@ -96,6 +100,16 @@ class RequirementsPipeline:
         logger.info("="*60)
         
         start_time = datetime.now()
+        import time
+        start_timestamp = time.time()
+        
+        # Start analytics tracking
+        self.analytics.start_tracking()
+        self.analytics.log_activity("info", f"Pipeline initialized - Product: {product}", {
+            "n_agents": n_agents,
+            "design_context": design_context
+        })
+        
         results = {
             "metadata": {
                 "start_time": start_time.isoformat(),
@@ -108,8 +122,14 @@ class RequirementsPipeline:
         
         # Stage 1: Generate Agents
         logger.info("\n[STAGE 1/4] Generating User Agents...")
+        stage_start = time.time()
+        self.analytics.log_activity("stage_start", "Starting agent generation stage", {"n_agents": n_agents})
+        
         agents = self.agent_generator.generate_agents(n_agents, design_context)
         results["agents"] = agents
+        
+        stage_end = time.time()
+        self.analytics.track_stage("agent_generation", stage_start, stage_end, len(agents))
         logger.info(f"✓ Generated {len(agents)} agents")
         
         if save_intermediate:
@@ -117,8 +137,14 @@ class RequirementsPipeline:
         
         # Stage 2: Simulate Experiences
         logger.info("\n[STAGE 2/4] Simulating User Experiences...")
+        stage_start = time.time()
+        self.analytics.log_activity("stage_start", "Starting experience simulation stage", {})
+        
         experiences = self.experience_simulator.simulate_multiple_experiences(agents, product)
         results["experiences"] = experiences
+        
+        stage_end = time.time()
+        self.analytics.track_stage("experience_simulation", stage_start, stage_end, len(experiences))
         logger.info(f"✓ Simulated {len(experiences)} experiences")
         
         if save_intermediate:
@@ -126,9 +152,15 @@ class RequirementsPipeline:
         
         # Stage 3: Conduct Interviews
         logger.info("\n[STAGE 3/4] Conducting Interviews...")
+        stage_start = time.time()
+        self.analytics.log_activity("stage_start", "Starting interview stage", {})
+        
         interviews = self.interviewer.conduct_multiple_interviews(experiences)
         results["interviews"] = interviews
         total_qa = sum(len(i["interview"]) for i in interviews)
+        
+        stage_end = time.time()
+        self.analytics.track_stage("interviews", stage_start, stage_end, total_qa)
         logger.info(f"✓ Completed {len(interviews)} interviews ({total_qa} Q&A pairs)")
         
         if save_intermediate:
@@ -136,12 +168,18 @@ class RequirementsPipeline:
         
         # Stage 4: Extract Latent Needs
         logger.info("\n[STAGE 4/4] Extracting Latent Needs...")
+        stage_start = time.time()
+        self.analytics.log_activity("stage_start", "Starting need extraction stage", {})
+        
         need_extractions = self.need_extractor.extract_from_multiple_interviews(interviews)
         results["need_extractions"] = need_extractions
         
         # Aggregate needs
         aggregated_needs = self.need_extractor.aggregate_needs(need_extractions)
         results["aggregated_needs"] = aggregated_needs
+        
+        stage_end = time.time()
+        self.analytics.track_stage("need_extraction", stage_start, stage_end, aggregated_needs['total_needs'])
         
         logger.info(f"✓ Extracted {aggregated_needs['total_needs']} total needs")
         logger.info(f"  - Categories: {list(aggregated_needs['summary']['by_category'].keys())}")
@@ -158,8 +196,15 @@ class RequirementsPipeline:
         results["metadata"]["duration_seconds"] = duration
         results["metadata"]["status"] = "completed"
         
+        # Add analytics to results
+        analytics_summary = self.analytics.get_summary()
+        results["analytics"] = analytics_summary
+        
         logger.info("="*60)
         logger.info(f"Pipeline Completed Successfully in {duration:.2f}s")
+        logger.info(f"Total API Calls: {analytics_summary['overview']['total_api_calls']}")
+        logger.info(f"Total Cost: ${analytics_summary['overview']['total_cost']:.4f}")
+        logger.info(f"Total Tokens: {analytics_summary['overview']['total_tokens']:,}")
         logger.info("="*60)
         
         return results

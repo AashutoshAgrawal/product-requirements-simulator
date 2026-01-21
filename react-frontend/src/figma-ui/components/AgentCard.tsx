@@ -22,7 +22,7 @@ export function AgentCard({ agent, index }: AgentCardProps) {
               <User className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-muted-foreground mb-1">Agent {agent.id + 1}</div>
+              <div className="text-xs text-muted-foreground mb-1">Agent {agent.id}</div>
               <CardTitle className="text-base">{agent.name}</CardTitle>
             </div>
           </div>

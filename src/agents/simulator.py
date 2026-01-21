@@ -4,7 +4,7 @@ Experience Simulator Module
 This module simulates user experiences with products based on agent personas.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 
 from ..llm.gemini_client import GeminiClient
@@ -54,7 +54,8 @@ class ExperienceSimulator:
     def simulate_experience(
         self,
         agent: str,
-        product: str = "tent"
+        product: str = "tent",
+        agent_id: Optional[int] = None
     ) -> str:
         """
         Simulate a single agent's experience with a product.
@@ -62,6 +63,7 @@ class ExperienceSimulator:
         Args:
             agent: The agent description/persona
             product: The product being interacted with
+            agent_id: Optional agent ID for analytics tracking
             
         Returns:
             A detailed experience narrative with steps
@@ -73,7 +75,7 @@ class ExperienceSimulator:
             product=product
         )
         
-        experience = self.llm_client.run(prompt)
+        experience = self.llm_client.run(prompt, _stage="experience_simulation", _agent_id=str(agent_id) if agent_id is not None else None)
         logger.debug("Experience simulation completed")
         
         return experience
@@ -100,7 +102,7 @@ class ExperienceSimulator:
         for idx, agent in enumerate(agents, 1):
             logger.debug(f"Processing agent {idx}/{len(agents)}")
             
-            experience = self.simulate_experience(agent, product)
+            experience = self.simulate_experience(agent, product, agent_id=idx)
             
             results.append({
                 "agent_id": idx,

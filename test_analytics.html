@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Test - Elicitron</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 24px;
+        }
+        .input-section {
+            margin-bottom: 24px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 16px;
+        }
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin: 24px 0;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric-card.blue {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .metric-card.green {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        .metric-card.orange {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .metric-card.purple {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .metric-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .metric-detail {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+        .progress-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s;
+        }
+        .hidden {
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Elicitron Analytics Demo</h1>
+        <p class="subtitle">Test the new analytics system - see API costs, timing, and behind-the-scenes metrics</p>
+        
+        <div class="input-section">
+            <label for="description">Project Description</label>
+            <textarea id="description" placeholder="Example: A productivity app that helps users organize tasks with AI-powered suggestions">A mobile app for tracking daily water intake with reminders and health insights</textarea>
+        </div>
+        
+        <button id="submitBtn" onclick="startAnalysis()">Start Analysis</button>
+        
+        <div id="status" class="status hidden"></div>
+    </div>
+    
+    <div id="results" class="hidden">
+        <div class="container">
+            <h2>📊 Analytics Dashboard</h2>
+            
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <div>Processing pipeline...</div>
+            </div>
+            
+            <div id="analytics" class="hidden">
+                <div class="analytics-grid">
+                    <div class="metric-card blue">
+                        <div class="metric-label">Total API Calls</div>
+                        <div class="metric-value" id="apiCalls">-</div>
+                        <div class="metric-detail" id="successRate">-</div>
+                    </div>
+                    <div class="metric-card green">
+                        <div class="metric-label">Total Cost</div>
+                        <div class="metric-value" id="totalCost">-</div>
+                        <div class="metric-detail" id="costBreakdown">-</div>
+                    </div>
+                    <div class="metric-card orange">
+                        <div class="metric-label">Total Latency</div>
+                        <div class="metric-value" id="totalLatency">-</div>
+                        <div class="metric-detail" id="avgLatency">-</div>
+                    </div>
+                    <div class="metric-card purple">
+                        <div class="metric-label">Total Tokens</div>
+                        <div class="metric-value" id="totalTokens">-</div>
+                        <div class="metric-detail" id="tokenBreakdown">-</div>
+                    </div>
+                </div>
+                
+                <h3>Per-Stage Performance</h3>
+                <table id="stageTable">
+                    <thead>
+                        <tr>
+                            <th>Stage</th>
+                            <th>Duration</th>
+                            <th>API Calls</th>
+                            <th>Cost</th>
+                            <th>Tokens</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stageTableBody">
+                    </tbody>
+                </table>
+                
+                <h3>API Call Timeline</h3>
+                <div id="apiTimeline"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let jobId = null;
+        let pollInterval = null;
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.classList.remove('hidden');
+        }
+
+        async function startAnalysis() {
+            const description = document.getElementById('description').value.trim();
+            if (!description) {
+                showStatus('Please enter a project description', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            
+            showStatus('Submitting analysis request...', 'info');
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+
+            try {
+                const response = await fetch('http://localhost:8000/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        description: description
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                jobId = data.job_id;
+                showStatus(`Job started! ID: ${jobId}`, 'success');
+                
+                // Start polling for results
+                pollInterval = setInterval(checkStatus, 2000);
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Start Analysis';
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        async function checkStatus() {
+            if (!jobId) return;
+
+            try {
+                const response = await fetch(`http://localhost:8000/api/status/${jobId}`);
+                const data = await response.json();
+
+                if (data.status === 'completed') {
+                    clearInterval(pollInterval);
+                    await loadResults();
+                } else if (data.status === 'failed') {
+                    clearInterval(pollInterval);
+                    showStatus('Analysis failed: ' + data.error, 'error');
+                    resetButton();
+                    document.getElementById('loading').classList.add('hidden');
+                } else {
+                    showStatus(`Processing: ${data.current_stage || 'Working...'}`, 'info');
+                }
+            } catch (error) {
+                console.error('Status check error:', error);
+            }
+        }
+
+        async function loadResults() {
+            try {
+                const response = await fetch(`http://localhost:8000/api/results/${jobId}`);
+                const data = await response.json();
+
+                document.getElementById('loading').classList.add('hidden');
+                
+                if (data.analytics) {
+                    displayAnalytics(data.analytics);
+                    document.getElementById('analytics').classList.remove('hidden');
+                    showStatus('Analysis complete! Analytics displayed below.', 'success');
+                } else {
+                    showStatus('Analysis complete but no analytics data available', 'error');
+                }
+                
+                resetButton();
+            } catch (error) {
+                showStatus(`Error loading results: ${error.message}`, 'error');
+                resetButton();
+            }
+        }
+
+        function displayAnalytics(analytics) {
+            // Display overview metrics
+            const summary = analytics.summary;
+            document.getElementById('apiCalls').textContent = summary.total_api_calls;
+            document.getElementById('successRate').textContent = 
+                `${summary.successful_calls} successful, ${summary.failed_calls} failed`;
+            
+            document.getElementById('totalCost').textContent = `$${summary.total_cost.toFixed(4)}`;
+            document.getElementById('costBreakdown').textContent = 
+                `Input: $${summary.total_input_cost.toFixed(4)} | Output: $${summary.total_output_cost.toFixed(4)}`;
+            
+            document.getElementById('totalLatency').textContent = `${summary.total_latency.toFixed(2)}s`;
+            document.getElementById('avgLatency').textContent = 
+                `Avg: ${summary.average_latency.toFixed(2)}s per call`;
+            
+            document.getElementById('totalTokens').textContent = summary.total_tokens.toLocaleString();
+            document.getElementById('tokenBreakdown').textContent = 
+                `Input: ${summary.total_input_tokens.toLocaleString()} | Output: ${summary.total_output_tokens.toLocaleString()}`;
+
+            // Display stage table
+            const tbody = document.getElementById('stageTableBody');
+            tbody.innerHTML = '';
+            
+            if (analytics.stages) {
+                analytics.stages.forEach(stage => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${stage.stage_name}</strong></td>
+                        <td>${stage.duration.toFixed(2)}s</td>
+                        <td>${stage.api_calls}</td>
+                        <td>$${stage.cost.toFixed(4)}</td>
+                        <td>${stage.total_tokens.toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            // Display API timeline
+            const timeline = document.getElementById('apiTimeline');
+            timeline.innerHTML = '';
+            
+            if (analytics.api_calls && analytics.api_calls.length > 0) {
+                analytics.api_calls.forEach((call, idx) => {
+                    const callDiv = document.createElement('div');
+                    callDiv.style.cssText = 'padding: 12px; border-left: 4px solid #007bff; background: #f8f9fa; margin-bottom: 8px; border-radius: 4px;';
+                    callDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <strong>Call #${idx + 1}: ${call.stage || 'Unknown'}</strong>
+                            <span style="color: ${call.status === 'success' ? '#2e7d32' : '#c62828'};">
+                                ${call.status === 'success' ? '✓' : '✗'} ${call.status}
+                            </span>
+                        </div>
+                        <div style="font-size: 13px; color: #666;">
+                            Duration: ${call.duration.toFixed(2)}s | 
+                            Model: ${call.model} | 
+                            Tokens: ${call.input_tokens + call.output_tokens} | 
+                            Cost: $${call.cost.toFixed(5)}
+                        </div>
+                    `;
+                    timeline.appendChild(callDiv);
+                });
+            }
+        }
+
+        function resetButton() {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = false;
+            btn.textContent = 'Start Analysis';
+            jobId = null;
+        }
+    </script>
+</body>
+</html>

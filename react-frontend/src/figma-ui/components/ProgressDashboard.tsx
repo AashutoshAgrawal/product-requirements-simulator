@@ -146,8 +146,28 @@ export function ProgressDashboard({ jobId, onComplete }: ProgressDashboardProps)
               <h3>User Interviews</h3>
               <span className="text-sm text-muted-foreground">
                 {intermediate_results.interviews.length} conducted
+                {progress.stage_number === 3 && !progress.completed && (
+                  <span className="ml-2 text-primary">• In progress</span>
+                )}
               </span>
             </div>
+            {progress.stage_number === 3 && !progress.completed && intermediate_results.interviews.length > 0 && (
+              <Card className="mb-4 border-primary/50 bg-primary/5">
+                <CardContent className="py-3">
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Currently asking Agent {intermediate_results.interviews[intermediate_results.interviews.length - 1].agent_id}:</span>
+                    <span className="ml-2 font-medium">
+                      {intermediate_results.interviews[intermediate_results.interviews.length - 1].interview[
+                        intermediate_results.interviews[intermediate_results.interviews.length - 1].interview.length - 1
+                      ]?.question || 'Conducting interview...'}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Question {intermediate_results.interviews[intermediate_results.interviews.length - 1].interview.length} in progress
+                  </p>
+                </CardContent>
+              </Card>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {intermediate_results.interviews.map((interview, idx) => (
                 <InterviewCard key={`int-${interview.agent_id}`} interview={interview} index={idx} />

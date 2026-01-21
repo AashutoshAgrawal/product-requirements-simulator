@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { AnalyticsView } from './AnalyticsView';
 
 interface ResultsViewProps {
   data: ProgressData;
@@ -185,7 +186,7 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
               <CardContent>
                 <div className="space-y-2">
                   {Object.entries(needsByCategory)
-                    .sort(([, a], [, b]) => b - a)
+                    .sort(([, a], [, b]) => (b as number) - (a as number))
                     .slice(0, 3)
                     .map(([category, count]) => (
                       <div key={category} className="flex items-center justify-between text-sm">
@@ -204,10 +205,14 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
         {/* Detailed Results */}
         <section>
           <Tabs defaultValue="needs" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="needs">
                 <Lightbulb className="w-4 h-4 mr-2" />
                 Needs
+              </TabsTrigger>
+              <TabsTrigger value="analytics">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Analytics
               </TabsTrigger>
               <TabsTrigger value="agents">
                 <User className="w-4 h-4 mr-2" />
@@ -222,6 +227,22 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
                 Interviews
               </TabsTrigger>
             </TabsList>
+
+            {/* Analytics Tab */}
+            <TabsContent value="analytics" className="mt-6">
+              {data.analytics ? (
+                <AnalyticsView 
+                  analytics={data.analytics} 
+                  agents={agents.map(a => a.name || '')}
+                />
+              ) : (
+                <Card className="border-dashed">
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    Analytics data not available for this run
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
             {/* Needs Tab */}
             <TabsContent value="needs" className="space-y-4 mt-6">
@@ -372,7 +393,7 @@ function AgentDetailCard({ agent }: { agent: Agent }) {
             <User className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <div className="text-xs text-muted-foreground mb-1">Agent {agent.id + 1}</div>
+            <div className="text-xs text-muted-foreground mb-1">Agent {agent.id}</div>
             <CardTitle>{agent.name}</CardTitle>
             <CardDescription className="mt-2">{agent.description}</CardDescription>
           </div>
@@ -394,7 +415,7 @@ function ExperienceDetailCard({ experience }: { experience: Experience }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="w-5 h-5" />
-          Agent {experience.agent_id + 1} Experience
+          Agent {experience.agent_id} Experience
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -428,7 +449,7 @@ function InterviewDetailCard({ interview }: { interview: Interview }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5" />
-          Agent {interview.agent_id + 1} Interview
+          Agent {interview.agent_id} Interview
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

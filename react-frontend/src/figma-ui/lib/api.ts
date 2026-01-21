@@ -45,6 +45,68 @@ export interface Need {
   question?: string;
 }
 
+export interface AnalyticsData {
+  overview: {
+    total_duration: number;
+    total_api_calls: number;
+    successful_calls: number;
+    failed_calls: number;
+    total_tokens: number;
+    total_cost: number;
+    avg_latency: number;
+    tokens_per_second: number;
+  };
+  stage_breakdown: {
+    [stage: string]: {
+      duration: number;
+      items: number;
+      api_calls: number;
+      tokens: number;
+      cost: number;
+    };
+  };
+  agent_performance: Array<{
+    agent_id: string;
+    total_duration: number;
+    total_cost: number;
+    total_tokens: number;
+    stages: {
+      [stage: string]: {
+        duration: number;
+        tokens: number;
+        cost: number;
+      };
+    };
+  }>;
+  api_calls: Array<{
+    call_id: string;
+    stage: string;
+    agent_id: string | null;
+    timestamp: string;
+    duration: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    model: string;
+    cost: number;
+    status: string;
+    error: string | null;
+    retry_count: number;
+  }>;
+  activity_log: Array<{
+    timestamp: string;
+    type: string;
+    message: string;
+    metadata: any;
+  }>;
+  extremes: {
+    slowest_call: any;
+    fastest_call: any;
+    most_expensive_agent: any;
+    fastest_agent: any;
+  };
+}
+
 export interface ProgressData {
   status: 'processing' | 'completed' | 'failed';
   progress: {
@@ -60,6 +122,7 @@ export interface ProgressData {
     interviews: Interview[];
     needs: Need[];
   };
+  analytics?: AnalyticsData;
 }
 
 export interface JobResponse {
@@ -283,7 +346,8 @@ export async function getResults(job_id: string): Promise<ProgressData | null> {
         experiences,
         interviews,
         needs: allNeeds
-      }
+      },
+      analytics: results.analytics || undefined
     };
   } catch (error) {
     console.error('Error fetching results:', error);

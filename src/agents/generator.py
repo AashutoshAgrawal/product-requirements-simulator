@@ -83,7 +83,7 @@ class AgentGenerator:
                 context_block=context_block
             )
             
-            agent_text = self.llm_client.run(prompt)
+            agent_text = self.llm_client.run(prompt, _stage="agent_generation", _agent_id=str(i + 1))
             agents.append(agent_text)
             
             # Update context for next iteration
@@ -145,7 +145,7 @@ class AgentGenerator:
             context_block=context_block
         )
         
-        agent_text = self.llm_client.run(prompt)
+        agent_text = self.llm_client.run(prompt, _stage="agent_generation", _agent_id="regeneration")
         logger.info("Agent regenerated successfully")
         
         return agent_text

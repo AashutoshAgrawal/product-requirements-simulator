@@ -32,6 +32,7 @@ from src.llm.openai_client import OpenAIClient
 from src.llm.base_client import BaseLLMClient
 from src.pipeline.pipeline import RequirementsPipeline
 from src.utils.logger import configure_logging, get_logger
+from src.utils.analytics import AnalyticsCollector
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -124,6 +125,9 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         config = load_config()
         interview_questions = load_interview_questions()
         
+        # Initialize analytics collector
+        analytics = AnalyticsCollector()
+        
         # Initialize LLM client based on provider
         llm_config = config.get('llm', {})
         provider = llm_config.get('provider', 'gemini').lower()
@@ -134,7 +138,8 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
                 temperature=llm_config.get('temperature', 0.7),
                 max_retries=llm_config.get('max_retries', 3),
                 retry_delay=llm_config.get('retry_delay', 2),
-                rate_limit_delay=llm_config.get('rate_limit_delay', 0.0)
+                rate_limit_delay=llm_config.get('rate_limit_delay', 0.0),
+                analytics_collector=analytics
             )
             logger.info(f"Job {job_id}: Using OpenAI with model {llm_config.get('model_name', 'gpt-4o-mini')}")
         elif provider == 'gemini':
@@ -143,7 +148,8 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
                 temperature=llm_config.get('temperature', 0.7),
                 max_retries=llm_config.get('max_retries', 3),
                 retry_delay=llm_config.get('retry_delay', 2),
-                rate_limit_delay=llm_config.get('rate_limit_delay', 12.0)
+                rate_limit_delay=llm_config.get('rate_limit_delay', 12.0),
+                analytics_collector=analytics
             )
             logger.info(f"Job {job_id}: Using Gemini with model {llm_config.get('model_name', 'gemini-1.5-flash')}")  # GEMINI: Log Gemini usage
         else:
@@ -152,7 +158,8 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         # Create pipeline
         pipeline = RequirementsPipeline(
             llm_client=llm_client,
-            interview_questions=interview_questions
+            interview_questions=interview_questions,
+            analytics_collector=analytics
         )
         
         # Initialize intermediate results storage
@@ -264,6 +271,9 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
             need_extractions
         )
         
+        # Get analytics summary
+        analytics_summary = analytics.get_summary()
+        
         # Prepare results
         results = {
             "metadata": {
@@ -279,7 +289,8 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
             "experiences": experiences,
             "interviews": interviews,
             "need_extractions": need_extractions,
-            "aggregated_needs": aggregated_needs
+            "aggregated_needs": aggregated_needs,
+            "analytics": analytics_summary
         }
         
         # Save results
