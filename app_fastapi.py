@@ -33,6 +33,7 @@ from src.llm.base_client import BaseLLMClient
 from src.pipeline.pipeline import RequirementsPipeline
 from src.utils.logger import configure_logging, get_logger
 from src.utils.analytics import AnalyticsCollector
+from src.utils.reproducibility import ReproducibilityTester
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -54,6 +55,7 @@ app.add_middleware(
 
 # In-memory job storage (use Redis in production)
 jobs: Dict[str, dict] = {}
+reproducibility_jobs: Dict[str, dict] = {}  # Separate storage for reproducibility tests
 logger = get_logger(__name__)
 
 
@@ -90,6 +92,31 @@ class JobStatusResponse(BaseModel):
 class ResultsResponse(BaseModel):
     job_id: str
     status: str
+    results: Optional[dict] = None
+
+
+class ReproducibilityRequest(BaseModel):
+    product: str = Field(..., min_length=1, description="Product name or idea")
+    design_context: str = Field(..., min_length=1, description="Design context or usage scenario")
+    n_agents: int = Field(default=3, ge=1, le=5, description="Number of agent personas per iteration")
+    n_iterations: int = Field(default=3, ge=2, le=10, description="Number of iterations to run")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "product": "camping tent",
+                "design_context": "ultralight backpacking in alpine conditions",
+                "n_agents": 3,
+                "n_iterations": 3
+            }
+        }
+
+
+class ReproducibilityStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: Optional[dict] = None
+    error: Optional[str] = None
     results: Optional[dict] = None
 
 
@@ -519,6 +546,189 @@ async def delete_job(job_id: str):
     
     del jobs[job_id]
     return {"message": f"Job {job_id} deleted"}
+
+
+# ==================== Reproducibility Testing Endpoints ====================
+
+async def run_reproducibility_test_async(
+    job_id: str,
+    product: str,
+    design_context: str,
+    n_agents: int,
+    n_iterations: int
+):
+    """
+    Background task to run reproducibility testing.
+    """
+    logger.info(f"Reproducibility job {job_id}: Starting test with {n_iterations} iterations")
+    
+    reproducibility_jobs[job_id]["status"] = "processing"
+    reproducibility_jobs[job_id]["progress"] = {
+        "iteration": 0,
+        "total": n_iterations,
+        "message": "Initializing reproducibility test..."
+    }
+    
+    try:
+        # Load config
+        config = load_config()
+        interview_questions = load_interview_questions()
+        
+        # Initialize LLM client based on provider (same logic as run_pipeline_async)
+        llm_config = config.get('llm', {})
+        provider = llm_config.get('provider', 'gemini').lower()
+        
+        if provider == 'openai':
+            llm_client = OpenAIClient(
+                model_name=llm_config.get('model_name', 'gpt-4o-mini'),
+                temperature=llm_config.get('temperature', 0.7),
+                max_retries=llm_config.get('max_retries', 3),
+                retry_delay=llm_config.get('retry_delay', 2),
+                rate_limit_delay=llm_config.get('rate_limit_delay', 0.0)
+            )
+            logger.info(f"Reproducibility job {job_id}: Using OpenAI with model {llm_config.get('model_name', 'gpt-4o-mini')}")
+        else:  # Default to Gemini
+            llm_client = GeminiClient(
+                model_name=llm_config.get('model_name', 'gemini-1.5-flash'),
+                temperature=llm_config.get('temperature', 0.7),
+                max_retries=llm_config.get('max_retries', 3),
+                retry_delay=llm_config.get('retry_delay', 2),
+                rate_limit_delay=llm_config.get('rate_limit_delay', 12.0)
+            )
+            logger.info(f"Reproducibility job {job_id}: Using Gemini with model {llm_config.get('model_name', 'gemini-1.5-flash')}")
+        
+        # Initialize reproducibility tester
+        tester = ReproducibilityTester(llm_client, interview_questions)
+        
+        def update_progress(progress_data):
+            reproducibility_jobs[job_id]["progress"] = {
+                "iteration": progress_data["iteration"],
+                "total": progress_data["total"],
+                "message": progress_data["message"]
+            }
+        
+        # Run reproducibility test
+        results = tester.run_iterations(
+            n_iterations=n_iterations,
+            product=product,
+            design_context=design_context,
+            n_agents=n_agents,
+            progress_callback=update_progress
+        )
+        
+        # Update job with results
+        reproducibility_jobs[job_id]["status"] = "completed"
+        reproducibility_jobs[job_id]["results"] = results
+        reproducibility_jobs[job_id]["progress"] = {
+            "iteration": n_iterations,
+            "total": n_iterations,
+            "message": "Reproducibility test completed!"
+        }
+        
+        logger.info(f"Reproducibility job {job_id}: Test completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Reproducibility job {job_id}: Test failed: {str(e)}")
+        reproducibility_jobs[job_id]["status"] = "failed"
+        reproducibility_jobs[job_id]["error"] = str(e)
+
+
+@app.post("/api/reproducibility/test", response_model=JobResponse)
+async def start_reproducibility_test(request: ReproducibilityRequest, background_tasks: BackgroundTasks):
+    """
+    Start a reproducibility test.
+    
+    This runs the pipeline multiple times with the same input and measures
+    the consistency/reproducibility of the outputs.
+    """
+    job_id = str(uuid.uuid4())
+    
+    # Initialize job
+    reproducibility_jobs[job_id] = {
+        "status": "queued",
+        "start_time": datetime.now().isoformat(),
+        "product": request.product,
+        "design_context": request.design_context,
+        "n_agents": request.n_agents,
+        "n_iterations": request.n_iterations
+    }
+    
+    # Add background task
+    background_tasks.add_task(
+        run_reproducibility_test_async,
+        job_id,
+        request.product,
+        request.design_context,
+        request.n_agents,
+        request.n_iterations
+    )
+    
+    logger.info(f"Created reproducibility job {job_id} for product: {request.product}")
+    
+    return JobResponse(
+        job_id=job_id,
+        status="queued",
+        message=f"Reproducibility test started with {request.n_iterations} iterations. Use the job_id to check status."
+    )
+
+
+@app.get("/api/reproducibility/status/{job_id}", response_model=ReproducibilityStatusResponse)
+async def get_reproducibility_status(job_id: str):
+    """
+    Get the status of a reproducibility test job.
+    """
+    if job_id not in reproducibility_jobs:
+        raise HTTPException(status_code=404, detail="Reproducibility job not found")
+    
+    job = reproducibility_jobs[job_id]
+    
+    return ReproducibilityStatusResponse(
+        job_id=job_id,
+        status=job["status"],
+        progress=job.get("progress"),
+        error=job.get("error"),
+        results=job.get("results")
+    )
+
+
+@app.get("/api/reproducibility/results/{job_id}")
+async def get_reproducibility_results(job_id: str):
+    """
+    Get the full results of a reproducibility test.
+    """
+    if job_id not in reproducibility_jobs:
+        raise HTTPException(status_code=404, detail="Reproducibility job not found")
+    
+    job = reproducibility_jobs[job_id]
+    
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail=f"Job not completed. Current status: {job['status']}")
+    
+    return {
+        "job_id": job_id,
+        "status": job["status"],
+        "results": job.get("results")
+    }
+
+
+@app.get("/api/reproducibility/jobs")
+async def list_reproducibility_jobs():
+    """
+    List all reproducibility test jobs.
+    """
+    return {
+        "total": len(reproducibility_jobs),
+        "jobs": [
+            {
+                "job_id": job_id,
+                "status": job["status"],
+                "product": job.get("product"),
+                "n_iterations": job.get("n_iterations"),
+                "start_time": job.get("start_time")
+            }
+            for job_id, job in reproducibility_jobs.items()
+        ]
+    }
 
 
 if __name__ == "__main__":

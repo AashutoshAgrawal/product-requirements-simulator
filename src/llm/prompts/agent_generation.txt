@@ -11,6 +11,10 @@ Create ONE new agent with the following structure:
 
 **Name**: [First name and brief role identifier]
 
+**Age**: [Specific age between 18-75]
+
+**Gender**: [Male, Female, or Non-binary]
+
 **Description**: [1-2 sentences describing this user's background, expertise level, and relationship to the product]
 
 **Reasoning**: [2-3 sentences explaining why this particular user perspective is valuable for understanding requirements and needs related to {design_context}]
@@ -20,5 +24,6 @@ Ensure this agent:
 - Has clear motivations and constraints
 - Provides a unique perspective on product usage
 - Is realistic and grounded in actual user types
+- Has diverse demographics (age, gender) compared to previous agents
 
 Generate the agent now:

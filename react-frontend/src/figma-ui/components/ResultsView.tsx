@@ -337,6 +337,13 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
 // Detail card components (NeedDetailCard removed - using NeedCard instead)
 
 function AgentDetailCard({ agent }: { agent: Agent }) {
+  // Gender color mapping
+  const genderConfig: Record<string, string> = {
+    Male: 'bg-blue-100 text-blue-700 border-blue-200',
+    Female: 'bg-pink-100 text-pink-700 border-pink-200',
+    'Non-binary': 'bg-purple-100 text-purple-700 border-purple-200'
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -344,9 +351,24 @@ function AgentDetailCard({ agent }: { agent: Agent }) {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
             <User className="w-6 h-6 text-primary" />
           </div>
-          <div>
+          <div className="flex-1">
             <div className="text-xs text-muted-foreground mb-1">Agent {agent.id}</div>
             <CardTitle>{agent.name}</CardTitle>
+            {/* Age and Gender Chips */}
+            {(agent.age || agent.gender) && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {agent.age && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                    {agent.age} yrs
+                  </span>
+                )}
+                {agent.gender && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${genderConfig[agent.gender] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                    {agent.gender}
+                  </span>
+                )}
+              </div>
+            )}
             <CardDescription className="mt-2">{agent.description}</CardDescription>
           </div>
         </div>

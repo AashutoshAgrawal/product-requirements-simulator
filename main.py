@@ -140,13 +140,13 @@ def main():
     try:
         if provider == 'openai':
             llm_client = OpenAIClient(
-                model_name=llm_config.get('model_name', 'gpt-4o-mini'),
+                model_name=llm_config.get('model_name', 'gpt-3.5-turbo'),
                 temperature=llm_config.get('temperature', 0.7),
                 max_retries=llm_config.get('max_retries', 3),
                 retry_delay=llm_config.get('retry_delay', 2),
                 rate_limit_delay=llm_config.get('rate_limit_delay', 0.0)
             )
-            logger.info(f"OpenAI client initialized with model: {llm_config.get('model_name', 'gpt-4o-mini')}")
+            logger.info(f"OpenAI client initialized with model: {llm_config.get('model_name', 'gpt-3.5-turbo')}")
         elif provider == 'gemini':
             llm_client = GeminiClient(  # GEMINI: Initialize Gemini client
                 model_name=llm_config.get('model_name', 'gemini-1.5-flash'),

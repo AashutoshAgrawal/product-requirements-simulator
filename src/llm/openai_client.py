@@ -32,7 +32,7 @@ class OpenAIClient(BaseLLMClient):
     
     def __init__(
         self,
-        model_name: str = "gpt-4o-mini",
+        model_name: str = "gpt-3.5-turbo",
         temperature: float = 0.7,
         max_retries: int = 3,
         retry_delay: int = 2,

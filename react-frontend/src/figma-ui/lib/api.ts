@@ -13,6 +13,8 @@ const API_BASE_URL = process.env.REACT_APP_API_URL ||
 export interface Agent {
   id: number;
   name: string;
+  age?: number;
+  gender?: 'Male' | 'Female' | 'Non-binary';
   description: string;
   reasoning: string;
 }
@@ -133,12 +135,16 @@ export interface JobResponse {
 // Parse agent text into structured format
 function parseAgent(agentText: string, index: number): Agent {
   const nameMatch = agentText.match(/\*\*Name\*\*:\s*(.+)/);
+  const ageMatch = agentText.match(/\*\*Age\*\*:\s*(\d+)/);
+  const genderMatch = agentText.match(/\*\*Gender\*\*:\s*(Male|Female|Non-binary)/i);
   const descMatch = agentText.match(/\*\*Description\*\*:\s*(.+?)(?:\n|$)/s);
   const reasoningMatch = agentText.match(/\*\*Reasoning\*\*:\s*(.+?)(?:\n\n|$)/s);
   
   return {
     id: index,
     name: nameMatch ? nameMatch[1].trim() : `Agent ${index + 1}`,
+    age: ageMatch ? parseInt(ageMatch[1], 10) : undefined,
+    gender: genderMatch ? (genderMatch[1].charAt(0).toUpperCase() + genderMatch[1].slice(1).toLowerCase()) as 'Male' | 'Female' | 'Non-binary' : undefined,
     description: descMatch ? descMatch[1].trim() : agentText,
     reasoning: reasoningMatch ? reasoningMatch[1].trim() : ''
   };
@@ -354,3 +360,71 @@ export async function getResults(job_id: string): Promise<ProgressData | null> {
     return null;
   }
 }
+
+// ==================== Reproducibility Testing API ====================
+
+export interface ReproducibilityJobResponse {
+  job_id: string;
+  status: string;
+  message: string;
+}
+
+export interface ReproducibilityStatusResponse {
+  job_id: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  progress?: {
+    iteration: number;
+    total: number;
+    message: string;
+  };
+  error?: string;
+  results?: any;
+}
+
+// Start a reproducibility test
+export async function startReproducibilityTest(data: {
+  product: string;
+  design_context: string;
+  n_agents: number;
+  n_iterations: number;
+}): Promise<ReproducibilityJobResponse> {
+  console.log('API: startReproducibilityTest called with:', data);
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/reproducibility/test`, {
+      product: data.product,
+      design_context: data.design_context,
+      n_agents: data.n_agents,
+      n_iterations: data.n_iterations
+    });
+    console.log('API: Response received:', response.data);
+    
+    return {
+      job_id: response.data.job_id,
+      status: response.data.status,
+      message: response.data.message
+    };
+  } catch (error) {
+    console.error('API: Error in startReproducibilityTest:', error);
+    throw error;
+  }
+}
+
+// Get reproducibility test status
+export async function getReproducibilityStatus(job_id: string): Promise<ReproducibilityStatusResponse> {
+  const response = await axios.get(`${API_BASE_URL}/api/reproducibility/status/${job_id}`);
+  
+  return {
+    job_id: response.data.job_id,
+    status: response.data.status,
+    progress: response.data.progress,
+    error: response.data.error,
+    results: response.data.results
+  };
+}
+
+// Get reproducibility test results
+export async function getReproducibilityResults(job_id: string): Promise<any> {
+  const response = await axios.get(`${API_BASE_URL}/api/reproducibility/results/${job_id}`);
+  return response.data.results;
+}
+
