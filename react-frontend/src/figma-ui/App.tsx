@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { InputForm } from './components/InputForm';
 import { ProgressDashboard } from './components/ProgressDashboard';
 import { ResultsView } from './components/ResultsView';
@@ -69,22 +69,27 @@ export default function App() {
     n_agents: number;
     n_iterations: number;
   }) => {
+    console.log('handleStartReproTest called with:', formData);
     try {
       const response = await startReproducibilityTest(formData);
+      console.log('startReproducibilityTest returned:', response);
       setJobId(response.job_id);
+      console.log('Setting state to repro-progress');
       setState('repro-progress');
       toast.success('Reproducibility test started!');
     } catch (error) {
+      console.error('handleStartReproTest error:', error);
       toast.error('Failed to start reproducibility test. Please try again.');
       console.error('Error starting reproducibility test:', error);
     }
   };
 
-  const handleReproComplete = (results: ReproducibilityResults) => {
+  const handleReproComplete = useCallback((results: ReproducibilityResults) => {
+    console.log('handleReproComplete called with:', results);
     setReproResults(results);
     setState('repro-results');
     toast.success('Reproducibility test completed!');
-  };
+  }, []);
 
   const handleGoToReproTest = () => {
     setState('repro-input');

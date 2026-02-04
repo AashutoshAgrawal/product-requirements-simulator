@@ -27,9 +27,7 @@ import yaml
 # Load environment variables from .env file
 load_dotenv()
 
-from src.llm.gemini_client import GeminiClient  # GEMINI: Gemini client import
-from src.llm.openai_client import OpenAIClient
-from src.llm.base_client import BaseLLMClient
+from src.llm.factory import create_llm_client
 from src.pipeline.pipeline import RequirementsPipeline
 from src.pipeline.pipeline_parallel import ParallelRequirementsPipeline
 from src.utils.logger import configure_logging, get_logger
@@ -166,38 +164,31 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
         # Initialize analytics collector
         analytics = AnalyticsCollector()
         
-        # Initialize LLM client based on provider
-        llm_config = config.get('llm', {})
-        provider = llm_config.get('provider', 'gemini').lower()
-        
-        if provider == 'openai':
-            llm_client = OpenAIClient(
-                model_name=llm_config.get('model_name', 'gpt-4o-mini'),
-                temperature=llm_config.get('temperature', 0.7),
-                max_retries=llm_config.get('max_retries', 3),
-                retry_delay=llm_config.get('retry_delay', 2),
-                rate_limit_delay=llm_config.get('rate_limit_delay', 0.0),
-                analytics_collector=analytics
-            )
-            logger.info(f"Job {job_id}: Using OpenAI with model {llm_config.get('model_name', 'gpt-4o-mini')}")
-        elif provider == 'gemini':
-            llm_client = GeminiClient(  # GEMINI: Initialize Gemini client
-                model_name=llm_config.get('model_name', 'gemini-1.5-flash'),
-                temperature=llm_config.get('temperature', 0.7),
-                max_retries=llm_config.get('max_retries', 3),
-                retry_delay=llm_config.get('retry_delay', 2),
-                rate_limit_delay=llm_config.get('rate_limit_delay', 12.0),
-                analytics_collector=analytics
-            )
-            logger.info(f"Job {job_id}: Using Gemini with model {llm_config.get('model_name', 'gemini-1.5-flash')}")  # GEMINI: Log Gemini usage
-        else:
-            raise ValueError(f"Unsupported LLM provider: {provider}. Choose 'gemini' or 'openai'")
+        # Initialize LLM client using factory
+        llm_client = create_llm_client(config, analytics, job_id)
         
         # ================================================================
         # PARALLEL MODE: Use the new ParallelRequirementsPipeline
         # ================================================================
         if pipeline_mode == "parallel":
             logger.info(f"Job {job_id}: Using PARALLEL pipeline mode")
+            
+            # Set initial progress for parallel mode
+            jobs[job_id]["progress"] = {
+                "stage": "generating_agents",
+                "stage_number": 1,
+                "total_stages": 4,
+                "message": "Starting parallel pipeline...",
+                "completed": False
+            }
+            
+            # Initialize intermediate results storage (will be populated during execution)
+            jobs[job_id]["intermediate_results"] = {
+                "agents": [],
+                "experiences": [],
+                "interviews": [],
+                "needs": []
+            }
             
             pipeline = ParallelRequirementsPipeline(
                 llm_client=llm_client,
@@ -207,13 +198,56 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
                 rate_limit_delay=0.0     # No delay
             )
             
-            # Run the parallel pipeline
+            # Progress callback to update job status during parallel execution
+            def update_progress(progress_info):
+                stage = progress_info.get("stage", "processing")
+                message = progress_info.get("message", "Processing...")
+                data = progress_info.get("data", {})
+                
+                # Update intermediate results if data is provided
+                if data:
+                    if "agents" in data:
+                        jobs[job_id]["intermediate_results"]["agents"] = data["agents"]
+                    if "experiences" in data:
+                        jobs[job_id]["intermediate_results"]["experiences"] = data["experiences"]
+                    if "interviews" in data:
+                        jobs[job_id]["intermediate_results"]["interviews"] = data["interviews"]
+                    if "needs" in data:
+                        jobs[job_id]["intermediate_results"]["needs"] = data["needs"]
+                
+                # Map parallel pipeline stages to UI-friendly stages
+                # In parallel mode, stages 2&3 happen together
+                stage_mapping = {
+                    "agent_generation": (1, "generating_agents", "Generating user personas..."),
+                    "agent_generation_complete": (1, "generating_agents", None),
+                    "parallel_processing": (2, "simulating_experiences", None),  # Use original message
+                    "parallel_complete": (3, "conducting_interviews", None),
+                    "experience_simulation": (2, "simulating_experiences", None),
+                    "interview": (3, "conducting_interviews", None),
+                    "need_extraction": (4, "extracting_needs", "Extracting latent needs..."),
+                    "need_extraction_complete": (4, "extracting_needs", None),
+                    "completed": (4, "completed", "Analysis complete!")
+                }
+                
+                stage_info = stage_mapping.get(stage, (2, "processing", None))
+                stage_num, stage_name, default_msg = stage_info
+                
+                jobs[job_id]["progress"] = {
+                    "stage": stage_name,
+                    "stage_number": stage_num,
+                    "total_stages": 4,
+                    "message": default_msg if default_msg else message,
+                    "completed": stage == "completed"
+                }
+            
+            # Run the parallel pipeline with progress callback
             results = await asyncio.to_thread(
                 pipeline.run,
                 n_agents,
                 design_context,
                 product_idea,
-                False  # save_intermediate
+                False,  # save_intermediate
+                update_progress  # progress_callback
             )
             
             # Store intermediate results from parallel pipeline
@@ -231,6 +265,15 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
             # Update job with results
             jobs[job_id]["status"] = results["metadata"].get("status", "completed")
             jobs[job_id]["results"] = results
+            
+            # Set final progress state - this triggers the frontend to show results
+            jobs[job_id]["progress"] = {
+                "stage": "completed",
+                "stage_number": 4,
+                "total_stages": 4,
+                "message": "Analysis complete!",
+                "completed": True
+            }
             
             # Save results to file
             results_dir = Path("results")
@@ -646,6 +689,12 @@ async def run_reproducibility_test_async(
     reproducibility_jobs[job_id]["progress"] = {
         "iteration": 0,
         "total": n_iterations,
+        "stage": "initializing",
+        "stage_name": "Initializing",
+        "current_agent": None,
+        "total_agents": n_agents,
+        "elapsed_seconds": 0,
+        "eta_seconds": None,
         "message": "Initializing reproducibility test..."
     }
     
@@ -654,37 +703,23 @@ async def run_reproducibility_test_async(
         config = load_config()
         interview_questions = load_interview_questions()
         
-        # Initialize LLM client based on provider (same logic as run_pipeline_async)
-        llm_config = config.get('llm', {})
-        provider = llm_config.get('provider', 'gemini').lower()
-        
-        if provider == 'openai':
-            llm_client = OpenAIClient(
-                model_name=llm_config.get('model_name', 'gpt-4o-mini'),
-                temperature=llm_config.get('temperature', 0.7),
-                max_retries=llm_config.get('max_retries', 3),
-                retry_delay=llm_config.get('retry_delay', 2),
-                rate_limit_delay=llm_config.get('rate_limit_delay', 0.0)
-            )
-            logger.info(f"Reproducibility job {job_id}: Using OpenAI with model {llm_config.get('model_name', 'gpt-4o-mini')}")
-        else:  # Default to Gemini
-            llm_client = GeminiClient(
-                model_name=llm_config.get('model_name', 'gemini-1.5-flash'),
-                temperature=llm_config.get('temperature', 0.7),
-                max_retries=llm_config.get('max_retries', 3),
-                retry_delay=llm_config.get('retry_delay', 2),
-                rate_limit_delay=llm_config.get('rate_limit_delay', 12.0)
-            )
-            logger.info(f"Reproducibility job {job_id}: Using Gemini with model {llm_config.get('model_name', 'gemini-1.5-flash')}")
+        # Initialize LLM client using factory
+        llm_client = create_llm_client(config, job_id=f"repro-{job_id}")
         
         # Initialize reproducibility tester
         tester = ReproducibilityTester(llm_client, interview_questions)
         
         def update_progress(progress_data):
             reproducibility_jobs[job_id]["progress"] = {
-                "iteration": progress_data["iteration"],
-                "total": progress_data["total"],
-                "message": progress_data["message"]
+                "iteration": progress_data.get("iteration", 0),
+                "total": progress_data.get("total", n_iterations),
+                "stage": progress_data.get("stage", "processing"),
+                "stage_name": progress_data.get("stage_name", "Processing..."),
+                "current_agent": progress_data.get("current_agent"),
+                "total_agents": progress_data.get("total_agents", n_agents),
+                "elapsed_seconds": progress_data.get("elapsed_seconds", 0),
+                "eta_seconds": progress_data.get("eta_seconds"),
+                "message": progress_data.get("message", "Processing...")
             }
         
         # Run reproducibility test
@@ -702,6 +737,12 @@ async def run_reproducibility_test_async(
         reproducibility_jobs[job_id]["progress"] = {
             "iteration": n_iterations,
             "total": n_iterations,
+            "stage": "completed",
+            "stage_name": "Completed",
+            "current_agent": None,
+            "total_agents": n_agents,
+            "elapsed_seconds": results.get("metadata", {}).get("total_duration", 0),
+            "eta_seconds": 0,
             "message": "Reproducibility test completed!"
         }
         
@@ -723,14 +764,25 @@ async def start_reproducibility_test(request: ReproducibilityRequest, background
     """
     job_id = str(uuid.uuid4())
     
-    # Initialize job
+    # Initialize job with progress field
     reproducibility_jobs[job_id] = {
         "status": "queued",
         "start_time": datetime.now().isoformat(),
         "product": request.product,
         "design_context": request.design_context,
         "n_agents": request.n_agents,
-        "n_iterations": request.n_iterations
+        "n_iterations": request.n_iterations,
+        "progress": {
+            "iteration": 0,
+            "total": request.n_iterations,
+            "stage": "queued",
+            "stage_name": "Queued",
+            "current_agent": None,
+            "total_agents": request.n_agents,
+            "elapsed_seconds": 0,
+            "eta_seconds": None,
+            "message": "Queued, waiting to start..."
+        }
     }
     
     # Add background task

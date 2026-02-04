@@ -9,27 +9,23 @@ This module provides a faster pipeline implementation that:
 Use this for faster execution when API rate limits allow.
 """
 
-import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime
 from threading import Semaphore
 
-from ..llm.gemini_client import GeminiClient
-from ..agents.generator import AgentGenerator
-from ..agents.simulator import ExperienceSimulator
-from ..agents.interviewer import Interviewer
-from ..agents.latent_extractor import LatentNeedExtractor
+from .base import BasePipeline
 from ..utils.logger import get_logger
-from ..utils.analytics import AnalyticsCollector
 
 logger = get_logger(__name__)
 
 
-class ParallelRequirementsPipeline:
+class ParallelRequirementsPipeline(BasePipeline):
     """
     Hybrid parallel pipeline for requirements elicitation.
+    
+    Inherits from BasePipeline for shared component initialization.
     
     This pipeline:
     - Generates agents serially (for diversity)
@@ -40,9 +36,9 @@ class ParallelRequirementsPipeline:
     
     def __init__(
         self,
-        llm_client: GeminiClient,
+        llm_client,
         interview_questions: Optional[List[str]] = None,
-        analytics_collector: Optional[AnalyticsCollector] = None,
+        analytics_collector = None,
         max_concurrent_calls: int = 0,  # 0 = unlimited
         rate_limit_delay: float = 0.0   # No delay by default
     ):
@@ -56,26 +52,17 @@ class ParallelRequirementsPipeline:
             max_concurrent_calls: Maximum concurrent API calls (0 = unlimited)
             rate_limit_delay: Delay between API calls (0 = no delay)
         """
-        self.llm_client = llm_client
-        self.analytics = analytics_collector or AnalyticsCollector()
+        # Initialize base class (shared components)
+        super().__init__(llm_client, interview_questions, analytics_collector)
+        
+        # Parallel-specific configuration
         self.max_concurrent_calls = max_concurrent_calls
         self.rate_limit_delay = rate_limit_delay
         
         # Semaphore for rate limiting (only if max_concurrent_calls > 0)
         self._api_semaphore = Semaphore(max_concurrent_calls) if max_concurrent_calls > 0 else None
         
-        # Initialize all components
-        self.agent_generator = AgentGenerator(llm_client)
-        self.experience_simulator = ExperienceSimulator(llm_client)
-        self.interviewer = Interviewer(llm_client, interview_questions)
-        self.need_extractor = LatentNeedExtractor(llm_client)
-        
         logger.info(f"ParallelRequirementsPipeline initialized (max_concurrent={'unlimited' if max_concurrent_calls == 0 else max_concurrent_calls})")
-    
-    def set_interview_questions(self, questions: List[str]) -> None:
-        """Set or update interview questions."""
-        self.interviewer.set_questions(questions)
-        logger.info(f"Pipeline interview questions updated: {len(questions)} questions")
     
     def _process_single_agent(
         self,
@@ -261,6 +248,15 @@ class ParallelRequirementsPipeline:
         agents = self.agent_generator.generate_agents(n_agents, design_context)
         results["agents"] = agents
         
+        # Send agents in progress callback for intermediate display
+        if progress_callback:
+            progress_callback({
+                "stage": "agent_generation_complete",
+                "message": f"Generated {len(agents)} user personas",
+                "progress": 25,
+                "data": {"agents": agents}
+            })
+        
         stage_end = time.time()
         agent_gen_time = stage_end - stage_start
         self.analytics.track_stage("agent_generation", stage_start, stage_end, len(agents))
@@ -274,9 +270,9 @@ class ParallelRequirementsPipeline:
         
         if progress_callback:
             progress_callback({
-                "stage": "parallel_processing",
-                "message": f"Processing {len(agents)} agents in parallel...",
-                "progress": 0
+                "stage": "experience_simulation",
+                "message": f"Simulating experiences for {len(agents)} agents...",
+                "progress": 25
             })
         
         # Process all agents in parallel using ThreadPoolExecutor
@@ -356,6 +352,18 @@ class ParallelRequirementsPipeline:
         successful_count = len([r for r in agent_results if r["success"]])
         total_qa = sum(len(i["interview"]) for i in interviews)
         
+        # Send experiences and interviews in progress callback
+        if progress_callback:
+            progress_callback({
+                "stage": "parallel_complete",
+                "message": f"Processed {successful_count} agents",
+                "progress": 75,
+                "data": {
+                    "experiences": experiences,
+                    "interviews": interviews
+                }
+            })
+        
         self.analytics.track_stage("parallel_processing", stage_start, stage_end, successful_count)
         logger.info(f"✓ Parallel processing completed in {parallel_time:.2f}s")
         logger.info(f"  - Successful: {successful_count}/{len(agents)} agents")
@@ -382,6 +390,20 @@ class ParallelRequirementsPipeline:
             # Aggregate needs
             aggregated_needs = self.need_extractor.aggregate_needs(need_extractions)
             results["aggregated_needs"] = aggregated_needs
+            
+            # Flatten needs for intermediate results
+            all_needs = []
+            for extraction in need_extractions:
+                all_needs.extend(extraction.get("needs", []))
+            
+            # Send needs in progress callback
+            if progress_callback:
+                progress_callback({
+                    "stage": "need_extraction_complete",
+                    "message": f"Extracted {aggregated_needs['total_needs']} needs",
+                    "progress": 95,
+                    "data": {"needs": all_needs}
+                })
             
             stage_end = time.time()
             self.analytics.track_stage("need_extraction", stage_start, stage_end, aggregated_needs['total_needs'])

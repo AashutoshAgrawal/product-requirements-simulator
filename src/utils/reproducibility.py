@@ -62,17 +62,32 @@ class ReproducibilityTester:
         logger.info(f"Starting reproducibility test: {n_iterations} iterations")
         
         start_time = datetime.now()
+        test_start_time = time.time()
         runs = []
+        iteration_times = []  # Track times for ETA calculation
         
         for i in range(n_iterations):
-            logger.info(f"Running iteration {i + 1}/{n_iterations}")
+            iteration_num = i + 1
+            logger.info(f"Running iteration {iteration_num}/{n_iterations}")
+            
+            # Calculate ETA based on previous iterations
+            elapsed_time = time.time() - test_start_time
+            avg_iteration_time = sum(iteration_times) / len(iteration_times) if iteration_times else 0
+            remaining_iterations = n_iterations - i
+            eta_seconds = avg_iteration_time * remaining_iterations if avg_iteration_time > 0 else None
             
             if progress_callback:
                 progress_callback({
-                    "iteration": i + 1,
+                    "iteration": iteration_num,
                     "total": n_iterations,
                     "status": "running",
-                    "message": f"Running iteration {i + 1} of {n_iterations}..."
+                    "stage": "initializing",
+                    "stage_name": "Initializing Pipeline",
+                    "current_agent": None,
+                    "total_agents": n_agents,
+                    "elapsed_seconds": elapsed_time,
+                    "eta_seconds": eta_seconds,
+                    "message": f"Starting iteration {iteration_num} of {n_iterations}..."
                 })
             
             try:
@@ -84,24 +99,51 @@ class ReproducibilityTester:
                     analytics_collector=analytics
                 )
                 
-                # Run pipeline
+                # Create stage progress callback for this iteration
+                def create_stage_callback(iter_num, total_iters, test_start):
+                    def stage_progress(stage_info):
+                        if progress_callback:
+                            current_elapsed = time.time() - test_start
+                            # Re-calculate ETA
+                            current_avg = sum(iteration_times) / len(iteration_times) if iteration_times else None
+                            current_eta = current_avg * (total_iters - iter_num + 1) if current_avg else None
+                            
+                            progress_callback({
+                                "iteration": iter_num,
+                                "total": total_iters,
+                                "status": "running",
+                                "stage": stage_info.get("stage", "unknown"),
+                                "stage_name": stage_info.get("stage_name", "Processing..."),
+                                "current_agent": stage_info.get("current_agent"),
+                                "total_agents": stage_info.get("total_agents", n_agents),
+                                "elapsed_seconds": current_elapsed,
+                                "eta_seconds": current_eta,
+                                "message": stage_info.get("message", f"Iteration {iter_num}/{total_iters}")
+                            })
+                    return stage_progress
+                
+                stage_cb = create_stage_callback(iteration_num, n_iterations, test_start_time)
+                
+                # Run pipeline with stage callbacks
                 iteration_start = time.time()
                 result = pipeline.run(
                     n_agents=n_agents,
                     design_context=design_context,
                     product=product,
-                    save_intermediate=False
+                    save_intermediate=False,
+                    progress_callback=stage_cb
                 )
                 iteration_duration = time.time() - iteration_start
+                iteration_times.append(iteration_duration)
                 
                 runs.append({
-                    "iteration": i + 1,
+                    "iteration": iteration_num,
                     "success": True,
                     "duration": iteration_duration,
                     "result": result
                 })
                 
-                logger.info(f"Iteration {i + 1} completed in {iteration_duration:.2f}s")
+                logger.info(f"Iteration {iteration_num} completed in {iteration_duration:.2f}s")
                 
             except Exception as e:
                 logger.error(f"Iteration {i + 1} failed: {str(e)}")

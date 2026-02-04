@@ -116,7 +116,7 @@ export interface AnalyticsData {
 }
 
 export interface ProgressData {
-  status: 'processing' | 'completed' | 'failed';
+  status: 'processing' | 'completed' | 'completed_with_errors' | 'failed';
   progress: {
     stage: string;
     stage_number: number;
@@ -402,14 +402,22 @@ export interface ReproducibilityJobResponse {
   message: string;
 }
 
+export interface ReproducibilityProgress {
+  iteration: number;
+  total: number;
+  stage: string;
+  stage_name: string;
+  current_agent: number | null;
+  total_agents: number;
+  elapsed_seconds: number;
+  eta_seconds: number | null;
+  message: string;
+}
+
 export interface ReproducibilityStatusResponse {
   job_id: string;
   status: 'queued' | 'processing' | 'completed' | 'failed';
-  progress?: {
-    iteration: number;
-    total: number;
-    message: string;
-  };
+  progress?: ReproducibilityProgress;
   error?: string;
   results?: any;
 }
@@ -444,15 +452,23 @@ export async function startReproducibilityTest(data: {
 
 // Get reproducibility test status
 export async function getReproducibilityStatus(job_id: string): Promise<ReproducibilityStatusResponse> {
-  const response = await axios.get(`${API_BASE_URL}/api/reproducibility/status/${job_id}`);
+  console.log('API: getReproducibilityStatus called for job:', job_id);
+  console.log('API: URL:', `${API_BASE_URL}/api/reproducibility/status/${job_id}`);
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/reproducibility/status/${job_id}`);
+    console.log('API: getReproducibilityStatus response:', response.data);
 
-  return {
-    job_id: response.data.job_id,
-    status: response.data.status,
-    progress: response.data.progress,
-    error: response.data.error,
-    results: response.data.results
-  };
+    return {
+      job_id: response.data.job_id,
+      status: response.data.status,
+      progress: response.data.progress,
+      error: response.data.error,
+      results: response.data.results
+    };
+  } catch (error) {
+    console.error('API: getReproducibilityStatus error:', error);
+    throw error;
+  }
 }
 
 // Get reproducibility test results

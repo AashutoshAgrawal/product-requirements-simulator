@@ -1,5 +1,5 @@
 """
-Requirements Elicitation Pipeline
+Sequential Requirements Elicitation Pipeline
 
 This module orchestrates the end-to-end workflow for requirements elicitation:
 1. Agent generation
@@ -8,77 +8,35 @@ This module orchestrates the end-to-end workflow for requirements elicitation:
 4. Latent need extraction
 """
 
+import time
 from typing import Dict, Any, List, Optional
-import json
 from datetime import datetime
 
-from ..llm.gemini_client import GeminiClient
-from ..agents.generator import AgentGenerator
-from ..agents.simulator import ExperienceSimulator
-from ..agents.interviewer import Interviewer
-from ..agents.latent_extractor import LatentNeedExtractor
+from .base import BasePipeline
 from ..utils.logger import get_logger
-from ..utils.analytics import AnalyticsCollector
 
 logger = get_logger(__name__)
 
 
-class RequirementsPipeline:
+class RequirementsPipeline(BasePipeline):
     """
-    Orchestrates the complete requirements elicitation pipeline.
+    Orchestrates the complete requirements elicitation pipeline (sequential mode).
     
-    This class manages the workflow from agent generation through need extraction,
-    coordinating all components and maintaining state throughout the process.
-    
-    Attributes:
-        llm_client (GeminiClient): The LLM client used by all components
-        agent_generator (AgentGenerator): Component for generating user agents
-        experience_simulator (ExperienceSimulator): Component for simulating experiences
-        interviewer (Interviewer): Component for conducting interviews
-        need_extractor (LatentNeedExtractor): Component for extracting needs
+    Inherits from BasePipeline for shared component initialization.
     """
     
-    def __init__(
-        self,
-        llm_client: GeminiClient,
-        interview_questions: Optional[List[str]] = None,
-        analytics_collector: Optional[AnalyticsCollector] = None
-    ):
-        """
-        Initialize the requirements pipeline.
-        
-        Args:
-            llm_client: An initialized Gemini client instance
-            interview_questions: Optional list of questions for interviews
-            analytics_collector: Optional AnalyticsCollector for metrics tracking
-        """
-        self.llm_client = llm_client
-        self.analytics = analytics_collector or AnalyticsCollector()
-        
-        # Initialize all components
-        self.agent_generator = AgentGenerator(llm_client)
-        self.experience_simulator = ExperienceSimulator(llm_client)
-        self.interviewer = Interviewer(llm_client, interview_questions)
-        self.need_extractor = LatentNeedExtractor(llm_client)
-        
+    def __init__(self, *args, **kwargs):
+        """Initialize the sequential pipeline."""
+        super().__init__(*args, **kwargs)
         logger.info("RequirementsPipeline initialized with all components")
-    
-    def set_interview_questions(self, questions: List[str]) -> None:
-        """
-        Set or update interview questions.
-        
-        Args:
-            questions: List of interview question strings
-        """
-        self.interviewer.set_questions(questions)
-        logger.info(f"Pipeline interview questions updated: {len(questions)} questions")
     
     def run(
         self,
         n_agents: int = 5,
         design_context: str = "camping tent",
         product: str = "tent",
-        save_intermediate: bool = False
+        save_intermediate: bool = False,
+        progress_callback: Optional[callable] = None
     ) -> Dict[str, Any]:
         """
         Run the complete requirements elicitation pipeline.
@@ -90,6 +48,7 @@ class RequirementsPipeline:
             design_context: Context for agent generation
             product: Product being studied
             save_intermediate: Whether to save intermediate results
+            progress_callback: Optional callback for stage progress updates
             
         Returns:
             Dictionary containing all pipeline results and metadata
@@ -102,6 +61,17 @@ class RequirementsPipeline:
         start_time = datetime.now()
         import time
         start_timestamp = time.time()
+        
+        # Helper to report progress
+        def report_progress(stage: str, stage_name: str, current_agent: int = None, message: str = None):
+            if progress_callback:
+                progress_callback({
+                    "stage": stage,
+                    "stage_name": stage_name,
+                    "current_agent": current_agent,
+                    "total_agents": n_agents,
+                    "message": message or f"{stage_name}..."
+                })
         
         # Start analytics tracking
         self.analytics.start_tracking()
@@ -122,6 +92,7 @@ class RequirementsPipeline:
         
         # Stage 1: Generate Agents
         logger.info("\n[STAGE 1/4] Generating User Agents...")
+        report_progress("agent_generation", "Generating Agents", message=f"Generating {n_agents} user personas...")
         stage_start = time.time()
         self.analytics.log_activity("stage_start", "Starting agent generation stage", {"n_agents": n_agents})
         
@@ -140,7 +111,12 @@ class RequirementsPipeline:
         stage_start = time.time()
         self.analytics.log_activity("stage_start", "Starting experience simulation stage", {})
         
-        experiences = self.experience_simulator.simulate_multiple_experiences(agents, product)
+        experiences = []
+        for idx, agent in enumerate(agents, 1):
+            report_progress("experience_simulation", "Simulating Experiences", 
+                          current_agent=idx, message=f"Simulating experience for Agent {idx}/{n_agents}...")
+            exp = self.experience_simulator.simulate_experience(agent, product)
+            experiences.append(exp)
         results["experiences"] = experiences
         
         stage_end = time.time()
@@ -155,7 +131,24 @@ class RequirementsPipeline:
         stage_start = time.time()
         self.analytics.log_activity("stage_start", "Starting interview stage", {})
         
-        interviews = self.interviewer.conduct_multiple_interviews(experiences)
+        interviews = []
+        for idx, exp_data in enumerate(experiences, 1):
+            report_progress("interviews", "Conducting Interviews",
+                          current_agent=idx, message=f"Interviewing Agent {idx}/{n_agents}...")
+            agent_id = exp_data.get("agent_id", idx-1)
+            qa_pairs = self.interviewer.conduct_interview(
+                agent=exp_data["agent"],
+                experience=exp_data["experience"],
+                product=exp_data.get("product", product),
+                agent_id=agent_id
+            )
+            interviews.append({
+                "agent_id": agent_id,
+                "agent": exp_data["agent"],
+                "experience": exp_data["experience"],
+                "product": exp_data.get("product", product),
+                "interview": qa_pairs
+            })
         results["interviews"] = interviews
         total_qa = sum(len(i["interview"]) for i in interviews)
         
@@ -171,10 +164,16 @@ class RequirementsPipeline:
         stage_start = time.time()
         self.analytics.log_activity("stage_start", "Starting need extraction stage", {})
         
-        need_extractions = self.need_extractor.extract_from_multiple_interviews(interviews)
+        need_extractions = []
+        for idx, interview in enumerate(interviews, 1):
+            report_progress("need_extraction", "Extracting Needs",
+                          current_agent=idx, message=f"Extracting needs from Agent {idx}/{n_agents}...")
+            extraction = self.need_extractor.extract_from_interview(interview)
+            need_extractions.append(extraction)
         results["need_extractions"] = need_extractions
         
         # Aggregate needs
+        report_progress("aggregation", "Aggregating Needs", message="Aggregating all extracted needs...")
         aggregated_needs = self.need_extractor.aggregate_needs(need_extractions)
         results["aggregated_needs"] = aggregated_needs
         
@@ -275,49 +274,6 @@ class RequirementsPipeline:
         logger.info(f"Partial pipeline completed: {start_stage} → {end_stage}")
         return results
     
-    def _save_intermediate(self, stage_name: str, data: Any) -> None:
-        """
-        Save intermediate results to a JSON file.
-        
-        Args:
-            stage_name: Name of the pipeline stage
-            data: Data to save
-        """
-        filename = f"intermediate_{stage_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        
-        try:
-            with open(filename, "w") as f:
-                json.dump(data, f, indent=2)
-            logger.debug(f"Saved intermediate results to {filename}")
-        except Exception as e:
-            logger.warning(f"Failed to save intermediate results: {e}")
-    
-    def get_summary(self, results: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Generate a summary of pipeline results.
-        
-        Args:
-            results: Complete pipeline results dictionary
-            
-        Returns:
-            Summary dictionary with key metrics
-        """
-        summary = {
-            "total_agents": len(results.get("agents", [])),
-            "total_experiences": len(results.get("experiences", [])),
-            "total_interviews": len(results.get("interviews", [])),
-            "total_qa_pairs": sum(
-                len(i.get("interview", [])) 
-                for i in results.get("interviews", [])
-            ),
-            "total_needs_extracted": results.get("aggregated_needs", {}).get("total_needs", 0),
-            "needs_by_category": results.get("aggregated_needs", {}).get("summary", {}).get("by_category", {}),
-            "needs_by_priority": results.get("aggregated_needs", {}).get("summary", {}).get("by_priority", {}),
-            "duration_seconds": results.get("metadata", {}).get("duration_seconds", 0)
-        }
-        
-        return summary
-    
     def export_results(
         self,
         results: Dict[str, Any],
@@ -335,6 +291,8 @@ class RequirementsPipeline:
         Returns:
             Path to the exported file
         """
+        import json
+        
         if filename is None:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"pipeline_results_{timestamp}.json"
