@@ -269,11 +269,13 @@ export async function submitAnalysis(data: {
   product: string;
   design_context: string;
   n_agents: number;
+  pipeline_mode?: string;
 }): Promise<JobResponse> {
   const response = await axios.post(`${API_BASE_URL}/api/analyze`, {
     product: data.product,
     design_context: data.design_context,
-    n_agents: data.n_agents
+    n_agents: data.n_agents,
+    pipeline_mode: data.pipeline_mode || 'sequential'
   });
   
   return {

@@ -5,7 +5,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Slider } from './ui/slider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Sparkles, History, Lightbulb, RefreshCw } from 'lucide-react';
+import { Sparkles, History, Lightbulb, RefreshCw, Zap } from 'lucide-react';
 
 const PROMPT_HISTORY_KEY = 'elicitron_prompt_history';
 const MAX_HISTORY_ITEMS = 10;
@@ -24,7 +24,7 @@ interface PromptHistoryItem {
 }
 
 interface InputFormProps {
-  onSubmit: (data: { product: string; design_context: string; n_agents: number }) => void;
+  onSubmit: (data: { product: string; design_context: string; n_agents: number; pipeline_mode: string }) => void;
   onReproducibilityTest?: () => void;
 }
 
@@ -55,6 +55,7 @@ export function InputForm({ onSubmit, onReproducibilityTest }: InputFormProps) {
   const [product, setProduct] = useState('');
   const [designContext, setDesignContext] = useState('');
   const [nAgents, setNAgents] = useState([3]);
+  const [pipelineMode, setPipelineMode] = useState<'sequential' | 'parallel'>('sequential');
   const [promptHistory, setPromptHistory] = useState<PromptHistoryItem[]>([]);
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [filteredHistory, setFilteredHistory] = useState<PromptHistoryItem[]>([]);
@@ -97,7 +98,8 @@ export function InputForm({ onSubmit, onReproducibilityTest }: InputFormProps) {
       onSubmit({
         product: product.trim(),
         design_context: designContext.trim(),
-        n_agents: nAgents[0]
+        n_agents: nAgents[0],
+        pipeline_mode: pipelineMode
       });
     }
   };
@@ -214,6 +216,39 @@ export function InputForm({ onSubmit, onReproducibilityTest }: InputFormProps) {
                 />
                 <p className="text-xs text-muted-foreground">
                   More agents provide diverse perspectives but take longer (≈1 min per agent)
+                </p>
+              </div>
+
+              {/* Pipeline Mode Toggle */}
+              <div className="space-y-3 p-4 rounded-lg bg-gray-100 border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className={`h-4 w-4 ${pipelineMode === 'parallel' ? 'text-amber-500' : 'text-gray-400'}`} />
+                    <Label htmlFor="pipeline-mode" className="font-medium cursor-pointer">
+                      Fast Mode (Parallel Processing)
+                    </Label>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={pipelineMode === 'parallel'}
+                    onClick={() => setPipelineMode(pipelineMode === 'parallel' ? 'sequential' : 'parallel')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                      pipelineMode === 'parallel' ? 'bg-primary' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform ${
+                        pipelineMode === 'parallel' ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {pipelineMode === 'parallel' 
+                    ? '⚡ Parallel: Faster execution (~2x speed), processes agents concurrently'
+                    : '🔄 Sequential: Traditional stage-by-stage execution, more stable'
+                  }
                 </p>
               </div>
 

@@ -31,6 +31,7 @@ from src.llm.gemini_client import GeminiClient  # GEMINI: Gemini client import
 from src.llm.openai_client import OpenAIClient
 from src.llm.base_client import BaseLLMClient
 from src.pipeline.pipeline import RequirementsPipeline
+from src.pipeline.pipeline_parallel import ParallelRequirementsPipeline
 from src.utils.logger import configure_logging, get_logger
 from src.utils.analytics import AnalyticsCollector
 from src.utils.reproducibility import ReproducibilityTester
@@ -64,13 +65,15 @@ class AnalyzeRequest(BaseModel):
     product: str = Field(..., min_length=1, description="Product name or idea")
     design_context: str = Field(..., min_length=1, description="Design context or usage scenario")
     n_agents: int = Field(default=1, ge=1, le=5, description="Number of agent personas to generate")
+    pipeline_mode: str = Field(default="sequential", description="Pipeline execution mode: 'sequential' or 'parallel'")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "product": "camping tent",
                 "design_context": "ultralight backpacking in alpine conditions",
-                "n_agents": 1
+                "n_agents": 1,
+                "pipeline_mode": "sequential"
             }
         }
 
@@ -137,16 +140,24 @@ def load_interview_questions(questions_path: str = "config/interview_questions.y
     return []
 
 
-async def run_pipeline_async(job_id: str, product_idea: str, design_context: str, n_agents: int):
+async def run_pipeline_async(job_id: str, product_idea: str, design_context: str, n_agents: int, pipeline_mode: str = "sequential"):
     """
     Run the requirements elicitation pipeline asynchronously.
+    
+    Args:
+        job_id: Unique job identifier
+        product_idea: Product name/idea
+        design_context: Design context description
+        n_agents: Number of agents to generate
+        pipeline_mode: 'sequential' (default) or 'parallel' execution mode
     """
     try:
         jobs[job_id]["status"] = "processing"
         jobs[job_id]["progress"] = {
             "stage": "initializing",
-            "message": "Starting pipeline..."
+            "message": f"Starting {pipeline_mode} pipeline..."
         }
+        jobs[job_id]["pipeline_mode"] = pipeline_mode
         
         # Load configuration
         config = load_config()
@@ -181,6 +192,64 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
             logger.info(f"Job {job_id}: Using Gemini with model {llm_config.get('model_name', 'gemini-1.5-flash')}")  # GEMINI: Log Gemini usage
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}. Choose 'gemini' or 'openai'")
+        
+        # ================================================================
+        # PARALLEL MODE: Use the new ParallelRequirementsPipeline
+        # ================================================================
+        if pipeline_mode == "parallel":
+            logger.info(f"Job {job_id}: Using PARALLEL pipeline mode")
+            
+            pipeline = ParallelRequirementsPipeline(
+                llm_client=llm_client,
+                interview_questions=interview_questions,
+                analytics_collector=analytics,
+                max_concurrent_calls=0,  # Unlimited - no throttling
+                rate_limit_delay=0.0     # No delay
+            )
+            
+            # Run the parallel pipeline
+            results = await asyncio.to_thread(
+                pipeline.run,
+                n_agents,
+                design_context,
+                product_idea,
+                False  # save_intermediate
+            )
+            
+            # Store intermediate results from parallel pipeline
+            jobs[job_id]["intermediate_results"] = {
+                "agents": results.get("agents", []),
+                "experiences": results.get("experiences", []),
+                "interviews": results.get("interviews", []),
+                "needs": []
+            }
+            
+            # Extract needs for intermediate display
+            for extraction in results.get("need_extractions", []):
+                jobs[job_id]["intermediate_results"]["needs"].extend(extraction.get("needs", []))
+            
+            # Update job with results
+            jobs[job_id]["status"] = results["metadata"].get("status", "completed")
+            jobs[job_id]["results"] = results
+            
+            # Save results to file
+            results_dir = Path("results")
+            results_dir.mkdir(exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"pipeline_results_{timestamp}_parallel.json"
+            results_path = results_dir / filename
+            
+            with open(results_path, 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            jobs[job_id]["results_file"] = str(results_path)
+            logger.info(f"Job {job_id}: Parallel pipeline completed")
+            return
+        
+        # ================================================================
+        # SEQUENTIAL MODE: Use the original RequirementsPipeline
+        # ================================================================
+        logger.info(f"Job {job_id}: Using SEQUENTIAL pipeline mode")
         
         # Create pipeline
         pipeline = RequirementsPipeline(
@@ -378,8 +447,17 @@ async def analyze(request: AnalyzeRequest, background_tasks: BackgroundTasks):
     Start a new requirements elicitation analysis.
     
     Returns a job_id for tracking progress.
+    
+    Pipeline modes:
+    - 'sequential': Traditional stage-by-stage execution (default)
+    - 'parallel': Hybrid parallel execution for faster processing
     """
     job_id = str(uuid.uuid4())
+    
+    # Validate pipeline mode
+    pipeline_mode = request.pipeline_mode.lower()
+    if pipeline_mode not in ["sequential", "parallel"]:
+        pipeline_mode = "sequential"
     
     # Initialize job
     jobs[job_id] = {
@@ -387,7 +465,8 @@ async def analyze(request: AnalyzeRequest, background_tasks: BackgroundTasks):
         "start_time": datetime.now().isoformat(),
         "product": request.product,
         "design_context": request.design_context,
-        "n_agents": request.n_agents
+        "n_agents": request.n_agents,
+        "pipeline_mode": pipeline_mode
     }
     
     # Add background task
@@ -396,15 +475,16 @@ async def analyze(request: AnalyzeRequest, background_tasks: BackgroundTasks):
         job_id,
         request.product,
         request.design_context,
-        request.n_agents
+        request.n_agents,
+        pipeline_mode
     )
     
-    logger.info(f"Created job {job_id} for product: {request.product}")
+    logger.info(f"Created job {job_id} for product: {request.product} (mode: {pipeline_mode})")
     
     return JobResponse(
         job_id=job_id,
         status="queued",
-        message="Analysis started. Use the job_id to check status."
+        message=f"Analysis started ({pipeline_mode} mode). Use the job_id to check status."
     )
 
 

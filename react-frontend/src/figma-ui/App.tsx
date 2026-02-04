@@ -21,12 +21,13 @@ export default function App() {
     product: string;
     design_context: string;
     n_agents: number;
+    pipeline_mode: string;
   }) => {
     try {
       const response = await submitAnalysis(formData);
       setJobId(response.job_id);
       setState('progress');
-      toast.success('Analysis started successfully!');
+      toast.success(`Analysis started (${formData.pipeline_mode} mode)!`);
     } catch (error) {
       toast.error('Failed to start analysis. Please try again.');
       console.error('Error starting analysis:', error);
