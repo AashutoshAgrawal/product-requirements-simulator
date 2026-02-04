@@ -7,13 +7,34 @@ IMPORTANT: Avoid repeating roles or characteristics from previously created agen
 Previously generated agents:
 {context_block}
 
-Create ONE new agent with the following structure:
+Create ONE new agent with the following structure. Use the exact section headers and bullet format.
 
-**Name**: [First name and brief role identifier]
+**Name**: [First name and last name only; do not include role in the name]
+
+**Occupation**: [Job title or role in one short phrase, e.g. "Business Owner", "Product Manager"]
 
 **Age**: [Specific age between 18-75]
 
 **Gender**: [Male, Female, or Non-binary]
+
+**Location**: [City, State or Region, e.g. "Austin, TX"]
+
+**Quote**: [One short, memorable quote in first person that captures this user's attitude toward the product or task, in quotation marks]
+
+**Goals** (exactly 3–6 words each; no full sentences):
+- [e.g. "Keep inventory updated easily"]
+- [e.g. "Manage staff schedules simply"]
+- [e.g. "Grow local customer base"]
+
+**Motivations** (exactly 3–6 words each; no full sentences):
+- [e.g. "Supporting local community"]
+- [e.g. "Financial stability for family"]
+- [e.g. "Legacy building"]
+
+**Pain Points** (exactly 3–6 words each; no full sentences):
+- [e.g. "Complicated software setup"]
+- [e.g. "Hidden subscription costs"]
+- [e.g. "Poor mobile app performance"]
 
 **Description**: [1-2 sentences describing this user's background, expertise level, and relationship to the product]
 
@@ -24,6 +45,8 @@ Ensure this agent:
 - Has clear motivations and constraints
 - Provides a unique perspective on product usage
 - Is realistic and grounded in actual user types
-- Has diverse demographics (age, gender) compared to previous agents
+- Has diverse demographics (age, gender, location) compared to previous agents
+
+CRITICAL: For Goals, Motivations, and Pain Points write ONLY concise phrases (3–6 words). Do not write full sentences.
 
 Generate the agent now:

@@ -4,8 +4,8 @@
 import axios from 'axios';
 
 // Use environment variable or default to localhost
-const API_BASE_URL = process.env.REACT_APP_API_URL || 
-  (process.env.NODE_ENV === 'production' 
+const API_BASE_URL = process.env.REACT_APP_API_URL ||
+  (process.env.NODE_ENV === 'production'
     ? 'https://elicitron-backend.onrender.com'
     : 'http://localhost:8000');
 
@@ -13,8 +13,14 @@ const API_BASE_URL = process.env.REACT_APP_API_URL ||
 export interface Agent {
   id: number;
   name: string;
+  occupation?: string;
   age?: number;
   gender?: 'Male' | 'Female' | 'Non-binary';
+  location?: string;
+  quote?: string;
+  goals?: string[];
+  motivations?: string[];
+  painPoints?: string[];
   description: string;
   reasoning: string;
 }
@@ -132,19 +138,44 @@ export interface JobResponse {
   status: string;
 }
 
+// Parse bullet list after a section (lines starting with - or •)
+function parseBulletSection(text: string, header: string): string[] {
+  const regex = new RegExp(`\\*\\*${header}\\*\\*:\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*|$)`, 'i');
+  const match = text.match(regex);
+  if (!match) return [];
+  const block = match[1].trim();
+  return block
+    .split(/\n/)
+    .map((line) => line.replace(/^[\s\-•*]+\s*/, '').trim())
+    .filter(Boolean);
+}
+
 // Parse agent text into structured format
 function parseAgent(agentText: string, index: number): Agent {
-  const nameMatch = agentText.match(/\*\*Name\*\*:\s*(.+)/);
+  const nameMatch = agentText.match(/\*\*Name\*\*:\s*(.+?)(?:\n|$)/);
+  const occupationMatch = agentText.match(/\*\*Occupation\*\*:\s*(.+?)(?:\n|$)/);
   const ageMatch = agentText.match(/\*\*Age\*\*:\s*(\d+)/);
   const genderMatch = agentText.match(/\*\*Gender\*\*:\s*(Male|Female|Non-binary)/i);
-  const descMatch = agentText.match(/\*\*Description\*\*:\s*(.+?)(?:\n|$)/s);
-  const reasoningMatch = agentText.match(/\*\*Reasoning\*\*:\s*(.+?)(?:\n\n|$)/s);
-  
+  const locationMatch = agentText.match(/\*\*Location\*\*:\s*(.+?)(?:\n|$)/);
+  const quoteMatch = agentText.match(/\*\*Quote\*\*:\s*["']?(.+?)["']?(?:\n|$)/s);
+  const descMatch = agentText.match(/\*\*Description\*\*:\s*([\s\S]*?)(?=\n\*\*Reasoning\*\*|$)/);
+  const reasoningMatch = agentText.match(/\*\*Reasoning\*\*:\s*([\s\S]*?)(?:\n\n|$)/);
+
+  const goals = parseBulletSection(agentText, 'Goals');
+  const motivations = parseBulletSection(agentText, 'Motivations');
+  const painPoints = parseBulletSection(agentText, 'Pain Points');
+
   return {
     id: index,
     name: nameMatch ? nameMatch[1].trim() : `Agent ${index + 1}`,
+    occupation: occupationMatch ? occupationMatch[1].trim() : undefined,
     age: ageMatch ? parseInt(ageMatch[1], 10) : undefined,
     gender: genderMatch ? (genderMatch[1].charAt(0).toUpperCase() + genderMatch[1].slice(1).toLowerCase()) as 'Male' | 'Female' | 'Non-binary' : undefined,
+    location: locationMatch ? locationMatch[1].trim() : undefined,
+    quote: quoteMatch ? quoteMatch[1].trim().replace(/^["']|["']$/g, '') : undefined,
+    goals: goals.length ? goals : undefined,
+    motivations: motivations.length ? motivations : undefined,
+    painPoints: painPoints.length ? painPoints : undefined,
     description: descMatch ? descMatch[1].trim() : agentText,
     reasoning: reasoningMatch ? reasoningMatch[1].trim() : ''
   };
@@ -153,17 +184,17 @@ function parseAgent(agentText: string, index: number): Agent {
 // Parse experience text into structured format
 function parseExperience(experienceText: string, agentId: number): Experience {
   const steps: Experience['steps'] = [];
-  
+
   if (!experienceText) {
     return { agent_id: agentId, steps: [] };
   }
-  
+
   // Try to parse structured format with Step 1, Step 2, etc.
   // Pattern: **Step 1:** or **Step 1:** followed by Action/Observation/Challenge
   const stepPattern = /\*\*Step\s+(\d+):?\*\*\s*\n-?\s*\*\*Action\*\*:\s*(.+?)(?=\n-?\s*\*\*Observation|\n-?\s*\*\*Challenge|\n\n|\*\*Step|$)/gs;
   const obsPattern = /\*\*Observation\*\*:\s*(.+?)(?=\n-?\s*\*\*Challenge|\n\n|\*\*Step|$)/gs;
   const challengePattern = /\*\*Challenge\*\*:\s*(.+?)(?=\n\n|\*\*Step|$)/gs;
-  
+
   // Find all step numbers
   const stepNumbers: number[] = [];
   let stepMatch;
@@ -171,29 +202,29 @@ function parseExperience(experienceText: string, agentId: number): Experience {
   while ((stepMatch = stepRegex.exec(experienceText)) !== null) {
     stepNumbers.push(parseInt(stepMatch[1]));
   }
-  
+
   // Parse each step
   for (let i = 0; i < stepNumbers.length; i++) {
     const stepNum = stepNumbers[i];
     const nextStepNum = stepNumbers[i + 1];
-    
+
     // Extract section for this step
     const stepStart = experienceText.indexOf(`**Step ${stepNum}**`);
     const stepEnd = nextStepNum ? experienceText.indexOf(`**Step ${nextStepNum}**`) : experienceText.length;
     const stepSection = experienceText.substring(stepStart, stepEnd);
-    
+
     // Extract Action
     const actionMatch = stepSection.match(/\*\*Action\*\*:\s*(.+?)(?=\n-?\s*\*\*Observation|\n-?\s*\*\*Challenge|\n\n|$)/s);
     const action = actionMatch ? actionMatch[1].trim() : '';
-    
+
     // Extract Observation
     const obsMatch = stepSection.match(/\*\*Observation\*\*:\s*(.+?)(?=\n-?\s*\*\*Challenge|\n\n|$)/s);
     const observation = obsMatch ? obsMatch[1].trim() : '';
-    
+
     // Extract Challenge
     const challengeMatch = stepSection.match(/\*\*Challenge\*\*:\s*(.+?)(?=\n\n|$)/s);
     const challenge = challengeMatch ? challengeMatch[1].trim() : '';
-    
+
     if (action || observation || challenge) {
       steps.push({
         step: stepNum,
@@ -203,7 +234,7 @@ function parseExperience(experienceText: string, agentId: number): Experience {
       });
     }
   }
-  
+
   // Fallback: if no structured format, create a single step with full text
   if (steps.length === 0) {
     steps.push({
@@ -213,7 +244,7 @@ function parseExperience(experienceText: string, agentId: number): Experience {
       challenge: ''
     });
   }
-  
+
   return {
     agent_id: agentId,
     steps
@@ -235,10 +266,10 @@ function normalizeNeeds(needs: any[]): Need[] {
 
 // Normalize intermediate results from backend
 function normalizeIntermediateResults(data: any): ProgressData['intermediate_results'] {
-  const agents: Agent[] = (data.agents || []).map((agent: string, idx: number) => 
+  const agents: Agent[] = (data.agents || []).map((agent: string, idx: number) =>
     parseAgent(agent, idx)
   );
-  
+
   const experiences: Experience[] = (data.experiences || []).map((exp: any) => {
     if (typeof exp.experience === 'string') {
       return parseExperience(exp.experience, exp.agent_id - 1);
@@ -248,14 +279,14 @@ function normalizeIntermediateResults(data: any): ProgressData['intermediate_res
       steps: []
     };
   });
-  
+
   const interviews: Interview[] = (data.interviews || []).map((int: any) => ({
     agent_id: int.agent_id - 1,
     interview: int.interview || []
   }));
-  
+
   const needs: Need[] = normalizeNeeds(data.needs || []);
-  
+
   return {
     agents,
     experiences,
@@ -277,7 +308,7 @@ export async function submitAnalysis(data: {
     n_agents: data.n_agents,
     pipeline_mode: data.pipeline_mode || 'sequential'
   });
-  
+
   return {
     job_id: response.data.job_id,
     status: response.data.status
@@ -287,11 +318,11 @@ export async function submitAnalysis(data: {
 // Get status with normalized intermediate results
 export async function getStatus(job_id: string): Promise<ProgressData> {
   const response = await axios.get(`${API_BASE_URL}/api/status/${job_id}`);
-  
+
   const intermediateResults = normalizeIntermediateResults(
     response.data.intermediate_results || {}
   );
-  
+
   return {
     status: response.data.status,
     progress: {
@@ -310,7 +341,7 @@ export async function getResults(job_id: string): Promise<ProgressData | null> {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/results/${job_id}`);
     const results = response.data.results;
-    
+
     // Flatten needs from aggregated_needs.categories if needed
     let allNeeds: Need[] = [];
     if (results.aggregated_needs?.categories) {
@@ -320,11 +351,11 @@ export async function getResults(job_id: string): Promise<ProgressData | null> {
     } else if (results.aggregated_needs?.all_needs) {
       allNeeds = normalizeNeeds(results.aggregated_needs.all_needs);
     }
-    
-    const agents: Agent[] = (results.agents || []).map((agent: string, idx: number) => 
+
+    const agents: Agent[] = (results.agents || []).map((agent: string, idx: number) =>
       parseAgent(agent, idx)
     );
-    
+
     const experiences: Experience[] = (results.experiences || []).map((exp: any) => {
       if (typeof exp.experience === 'string') {
         return parseExperience(exp.experience, exp.agent_id - 1);
@@ -334,12 +365,12 @@ export async function getResults(job_id: string): Promise<ProgressData | null> {
         steps: []
       };
     });
-    
+
     const interviews: Interview[] = (results.interviews || []).map((int: any) => ({
       agent_id: int.agent_id - 1,
       interview: int.interview || []
     }));
-    
+
     return {
       status: 'completed',
       progress: {
@@ -399,7 +430,7 @@ export async function startReproducibilityTest(data: {
       n_iterations: data.n_iterations
     });
     console.log('API: Response received:', response.data);
-    
+
     return {
       job_id: response.data.job_id,
       status: response.data.status,
@@ -414,7 +445,7 @@ export async function startReproducibilityTest(data: {
 // Get reproducibility test status
 export async function getReproducibilityStatus(job_id: string): Promise<ReproducibilityStatusResponse> {
   const response = await axios.get(`${API_BASE_URL}/api/reproducibility/status/${job_id}`);
-  
+
   return {
     job_id: response.data.job_id,
     status: response.data.status,

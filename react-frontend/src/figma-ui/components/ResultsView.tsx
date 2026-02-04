@@ -1,27 +1,32 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { ProgressData, Agent, Experience, Interview, Need } from '../lib/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { 
-  Download, 
-  ChevronDown, 
-  ChevronUp, 
-  Search, 
-  User, 
-  Activity, 
-  MessageSquare, 
+import {
+  Download,
+  Search,
+  User,
+  Activity,
+  MessageSquare,
   Lightbulb,
   BarChart3,
-  FileText
+  FileText,
+  Settings,
+  MousePointer2,
+  Zap,
+  Shield,
+  Heart,
+  Users,
+  Accessibility as AccessibilityIcon
 } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { AnalyticsView } from './AnalyticsView';
-import { NeedCard } from './NeedCard';
+import { TreeView, TreeNodeData } from './TreeView';
+import { PersonaProfile } from './PersonaProfile';
 
 interface ResultsViewProps {
   data: ProgressData;
@@ -32,13 +37,6 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    agents: true,
-    experiences: false,
-    interviews: false,
-    needs: true
-  });
-
   const { agents, experiences, interviews, needs } = data.intermediate_results;
 
   // Calculate summary statistics
@@ -61,21 +59,17 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
   // Filter needs
   const filteredNeeds = useMemo(() => {
     return needs.filter(need => {
-      const matchesSearch = searchQuery === '' || 
+      const matchesSearch = searchQuery === '' ||
         need.need_statement.toLowerCase().includes(searchQuery.toLowerCase()) ||
         need.evidence.toLowerCase().includes(searchQuery.toLowerCase()) ||
         need.design_implication.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       const matchesCategory = categoryFilter === 'all' || need.category === categoryFilter;
       const matchesPriority = priorityFilter === 'all' || need.priority === priorityFilter;
 
       return matchesSearch && matchesCategory && matchesPriority;
     });
   }, [needs, searchQuery, categoryFilter, priorityFilter]);
-
-  const toggleSection = (section: string) => {
-    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
 
   const handleDownload = () => {
     const exportData = {
@@ -232,8 +226,8 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
             {/* Analytics Tab */}
             <TabsContent value="analytics" className="mt-6">
               {data.analytics ? (
-                <AnalyticsView 
-                  analytics={data.analytics} 
+                <AnalyticsView
+                  analytics={data.analytics}
                   agents={agents.map(a => a.name || '')}
                 />
               ) : (
@@ -286,45 +280,147 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
                 </CardContent>
               </Card>
 
-              {/* Needs List */}
-              <div className="space-y-4">
-                {filteredNeeds.map((need, idx) => (
-                  <NeedCard key={idx} need={need} index={idx} />
-                ))}
-                {filteredNeeds.length === 0 && (
-                  <Card className="border-dashed">
-                    <CardContent className="py-12 text-center text-muted-foreground">
-                      No needs match your filters
-                    </CardContent>
-                  </Card>
+              {/* Needs: Collapsible tree by category */}
+              <div className="bg-card border border-border rounded-lg p-4 min-h-[400px]">
+                {filteredNeeds.length > 0 ? (
+                  <TreeView
+                    data={(() => {
+                      const grouped: Record<string, Need[]> = {};
+                      filteredNeeds.forEach((need) => {
+                        if (!grouped[need.category]) grouped[need.category] = [];
+                        grouped[need.category].push(need);
+                      });
+                      const categoryIcons: Record<string, ReactNode> = {
+                        Functional: <Settings className="w-4 h-4" />,
+                        Usability: <MousePointer2 className="w-4 h-4" />,
+                        Performance: <Zap className="w-4 h-4" />,
+                        Safety: <Shield className="w-4 h-4" />,
+                        Emotional: <Heart className="w-4 h-4" />,
+                        Social: <Users className="w-4 h-4" />,
+                        Accessibility: <AccessibilityIcon className="w-4 h-4" />,
+                      };
+                      return Object.entries(grouped)
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([category, items]): TreeNodeData => ({
+                          id: `cat-${category}`,
+                          label: category,
+                          icon: categoryIcons[category] ?? <Lightbulb className="w-4 h-4" />,
+                          badge: <Badge variant="outline">{items.length}</Badge>,
+                          children: items.map((need, idx): TreeNodeData => ({
+                            id: `need-${category}-${idx}`,
+                            label: need.need_statement,
+                            badge: (
+                              <Badge
+                                className={
+                                  need.priority === 'High'
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                    : need.priority === 'Medium'
+                                      ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                                }
+                                variant="secondary"
+                              >
+                                {need.priority}
+                              </Badge>
+                            ),
+                            content: (
+                              <div className="space-y-4">
+                                <div>
+                                  <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Evidence</p>
+                                  <p className="italic">&ldquo;{need.evidence}&rdquo;</p>
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Design Implication</p>
+                                  <p>{need.design_implication}</p>
+                                </div>
+                              </div>
+                            ),
+                          })),
+                        }));
+                    })()}
+                  />
+                ) : (
+                  <div className="py-12 text-center text-muted-foreground">No needs match your filters</div>
                 )}
               </div>
             </TabsContent>
 
-            {/* Agents Tab */}
+            {/* Agents Tab: Persona-style tree */}
             <TabsContent value="agents" className="space-y-4 mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {agents.map(agent => (
-                  <AgentDetailCard key={agent.id} agent={agent} />
-                ))}
+              <div className="bg-card border border-border rounded-lg p-4">
+                <TreeView
+                  data={agents.map((agent): TreeNodeData => ({
+                    id: `agent-${agent.id}`,
+                    label: (
+                      <div className="flex items-center gap-3 py-1">
+                        <div className="w-10 h-10 rounded-full border-2 border-primary/20 bg-primary/5 shrink-0 flex items-center justify-center text-sm font-bold text-primary">
+                          {agent.name.split(/\s+/).map((s) => s[0]).join('').toUpperCase().slice(0, 2)}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold text-base truncate">{agent.name}</span>
+                          <span className="text-xs text-muted-foreground truncate">{agent.description.split('.')[0]}.</span>
+                        </div>
+                      </div>
+                    ),
+                    content: (
+                      <div className="py-6 px-2 md:px-4">
+                        <PersonaProfile agent={agent} />
+                      </div>
+                    ),
+                  }))}
+                />
               </div>
             </TabsContent>
 
-            {/* Experiences Tab */}
+            {/* Experiences Tab: Collapsible tree by agent, then steps */}
             <TabsContent value="experiences" className="space-y-4 mt-6">
-              <div className="space-y-4">
-                {experiences.map(exp => (
-                  <ExperienceDetailCard key={exp.agent_id} experience={exp} />
-                ))}
+              <div className="bg-card border border-border rounded-lg p-4">
+                <TreeView
+                  data={experiences.map((exp): TreeNodeData => ({
+                    id: `exp-${exp.agent_id}`,
+                    label: agents.find((a) => a.id === exp.agent_id)?.name ?? `Agent ${exp.agent_id + 1}`,
+                    icon: <Activity className="w-4 h-4" />,
+                    children: exp.steps.map((step): TreeNodeData => ({
+                      id: `exp-${exp.agent_id}-step-${step.step}`,
+                      label: `Step ${step.step}: ${step.action.length > 80 ? step.action.slice(0, 80) + '…' : step.action}`,
+                      content: (
+                        <div className="space-y-3">
+                          <div>
+                            <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Observation</p>
+                            <p>{step.observation}</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Challenge Identified</p>
+                            <p className="text-destructive/90 dark:text-destructive font-medium">{step.challenge}</p>
+                          </div>
+                        </div>
+                      ),
+                    })),
+                  }))}
+                />
               </div>
             </TabsContent>
 
-            {/* Interviews Tab */}
+            {/* Interviews Tab: Collapsible tree by agent, then Q&A */}
             <TabsContent value="interviews" className="space-y-4 mt-6">
-              <div className="space-y-4">
-                {interviews.map(interview => (
-                  <InterviewDetailCard key={interview.agent_id} interview={interview} />
-                ))}
+              <div className="bg-card border border-border rounded-lg p-4">
+                <TreeView
+                  data={interviews.map((interview): TreeNodeData => ({
+                    id: `int-${interview.agent_id}`,
+                    label: agents.find((a) => a.id === interview.agent_id)?.name ?? `Agent ${interview.agent_id + 1}`,
+                    icon: <MessageSquare className="w-4 h-4" />,
+                    children: interview.interview.map((qa, idx): TreeNodeData => ({
+                      id: `int-${interview.agent_id}-qa-${idx}`,
+                      label: qa.question,
+                      content: (
+                        <div className="pl-2 border-l-2 border-primary/30 py-1">
+                          <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Answer</p>
+                          <p>{qa.answer}</p>
+                        </div>
+                      ),
+                    })),
+                  }))}
+                />
               </div>
             </TabsContent>
           </Tabs>
@@ -334,114 +430,3 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
   );
 }
 
-// Detail card components (NeedDetailCard removed - using NeedCard instead)
-
-function AgentDetailCard({ agent }: { agent: Agent }) {
-  // Gender color mapping
-  const genderConfig: Record<string, string> = {
-    Male: 'bg-blue-100 text-blue-700 border-blue-200',
-    Female: 'bg-pink-100 text-pink-700 border-pink-200',
-    'Non-binary': 'bg-purple-100 text-purple-700 border-purple-200'
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <User className="w-6 h-6 text-primary" />
-          </div>
-          <div className="flex-1">
-            <div className="text-xs text-muted-foreground mb-1">Agent {agent.id}</div>
-            <CardTitle>{agent.name}</CardTitle>
-            {/* Age and Gender Chips */}
-            {(agent.age || agent.gender) && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {agent.age && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700 border border-gray-200">
-                    {agent.age} yrs
-                  </span>
-                )}
-                {agent.gender && (
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${genderConfig[agent.gender] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                    {agent.gender}
-                  </span>
-                )}
-              </div>
-            )}
-            <CardDescription className="mt-2">{agent.description}</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="bg-muted/50 p-3 rounded-md">
-          <p className="text-xs text-muted-foreground mb-1">Reasoning:</p>
-          <p className="text-sm italic">{agent.reasoning}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ExperienceDetailCard({ experience }: { experience: Experience }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="w-5 h-5" />
-          Agent {experience.agent_id} Experience
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {experience.steps.map(step => (
-          <div key={step.step} className="pb-4 last:pb-0 border-b last:border-0">
-            <Badge variant="outline" className="mb-3">Step {step.step}</Badge>
-            <div className="space-y-2 text-sm">
-              <div>
-                <span className="text-muted-foreground">Action: </span>
-                <span>{step.action}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Observation: </span>
-                <span>{step.observation}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Challenge: </span>
-                <span className="italic">{step.challenge}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function InterviewDetailCard({ interview }: { interview: Interview }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageSquare className="w-5 h-5" />
-          Agent {interview.agent_id} Interview
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {interview.interview.map((qa, idx) => (
-          <div key={idx} className="pb-4 last:pb-0 border-b last:border-0">
-            <div className="space-y-2">
-              <p className="text-sm">
-                <span className="text-muted-foreground">Q: </span>
-                {qa.question}
-              </p>
-              <p className="text-sm pl-4 border-l-2 border-primary/30">
-                <span className="text-muted-foreground">A: </span>
-                {qa.answer}
-              </p>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
