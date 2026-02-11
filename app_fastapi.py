@@ -24,8 +24,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import yaml
 
-# Load environment variables from .env file
-load_dotenv()
+# Load .env from project root so env vars are available even when terminal
+# "python.terminal.useEnvFile" is disabled (backend loads .env itself)
+_env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=_env_path)
 
 from src.llm.factory import create_llm_client
 from src.pipeline.pipeline import RequirementsPipeline
@@ -216,28 +218,33 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
                         jobs[job_id]["intermediate_results"]["needs"] = data["needs"]
                 
                 # Map parallel pipeline stages to UI-friendly stages
-                # In parallel mode, stages 2&3 happen together
+                # In parallel mode, stages 2&3 happen together. Only "completed" means whole job done.
                 stage_mapping = {
                     "agent_generation": (1, "generating_agents", "Generating user personas..."),
                     "agent_generation_complete": (1, "generating_agents", None),
-                    "parallel_processing": (2, "simulating_experiences", None),  # Use original message
+                    "parallel_processing": (2, "simulating_experiences", None),
                     "parallel_complete": (3, "conducting_interviews", None),
                     "experience_simulation": (2, "simulating_experiences", None),
+                    "experience": (2, "simulating_experiences", None),
                     "interview": (3, "conducting_interviews", None),
+                    "agent_complete": (3, "conducting_interviews", None),
                     "need_extraction": (4, "extracting_needs", "Extracting latent needs..."),
                     "need_extraction_complete": (4, "extracting_needs", None),
-                    "completed": (4, "completed", "Analysis complete!")
+                    "completed": (4, "completed", "Analysis complete!"),
+                    "failed": (2, "simulating_experiences", None),
                 }
                 
                 stage_info = stage_mapping.get(stage, (2, "processing", None))
                 stage_num, stage_name, default_msg = stage_info
+                # Only set completed=True when pipeline sends stage "completed" (full run done)
+                is_job_complete = stage == "completed"
                 
                 jobs[job_id]["progress"] = {
                     "stage": stage_name,
                     "stage_number": stage_num,
                     "total_stages": 4,
                     "message": default_msg if default_msg else message,
-                    "completed": stage == "completed"
+                    "completed": is_job_complete
                 }
             
             # Run the parallel pipeline with progress callback
@@ -560,7 +567,7 @@ async def get_results(job_id: str):
     
     job = jobs[job_id]
     
-    if job["status"] != "completed":
+    if job["status"] not in ("completed", "completed_with_errors"):
         raise HTTPException(
             status_code=400,
             detail=f"Job not completed. Current status: {job['status']}"

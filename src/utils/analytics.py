@@ -162,8 +162,10 @@ class AnalyticsCollector:
         """Calculate approximate cost based on model and tokens."""
         # Pricing per 1K tokens (approximate as of 2024)
         pricing = {
+            "gpt-5-nano": {"input": 0.0001, "output": 0.0002},
             "gpt-4": {"input": 0.03, "output": 0.06},
             "gpt-4-turbo": {"input": 0.01, "output": 0.03},
+            "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
             "gpt-3.5-turbo": {"input": 0.0005, "output": 0.0015},
             "gemini-pro": {"input": 0.00025, "output": 0.0005},
             "gemini-1.5-pro": {"input": 0.00125, "output": 0.00375},

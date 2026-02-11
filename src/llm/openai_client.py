@@ -110,12 +110,16 @@ class OpenAIClient(BaseLLMClient):
             time.sleep(wait_time)
         
         # Prepare API parameters
+        temp_value = temperature if temperature is not None else self.temperature
+        # gpt-5-nano only supports temperature=1; API rejects other values
+        if self.model_name and "gpt-5-nano" in self.model_name.lower():
+            temp_value = 1.0
         params = {
             "model": self.model_name,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature if temperature is not None else self.temperature,
+            "temperature": temp_value,
         }
-        
+
         if max_output_tokens:
             params["max_tokens"] = max_output_tokens
         

@@ -162,8 +162,8 @@ class ParallelRequirementsPipeline(BasePipeline):
             if progress_callback:
                 progress_callback({
                     "agent_id": agent_id,
-                    "stage": "completed",
-                    "message": f"Agent {agent_id}: Completed!"
+                    "stage": "agent_complete",
+                    "message": f"Agent {agent_id} completed"
                 })
             
         except Exception as e:

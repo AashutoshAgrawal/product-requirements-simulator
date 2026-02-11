@@ -45,8 +45,8 @@ export function ProgressDashboard({ jobId, onComplete }: ProgressDashboardProps)
         setProgressData(data);
         setPrevCounts(currentCounts);
 
-        // Check for completion - also handle 'completed_with_errors' from parallel mode
-        if (data.status === 'completed' || data.status === 'completed_with_errors' || data.progress.completed) {
+        // Check for completion only via backend status (avoid 400 from polling results too early)
+        if (data.status === 'completed' || data.status === 'completed_with_errors') {
           clearInterval(intervalId);
           setTimeout(() => onComplete(data), 1000);
         }

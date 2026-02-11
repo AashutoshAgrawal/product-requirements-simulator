@@ -3,8 +3,8 @@
 # LLM Configuration
 llm:
   provider: "openai"  # Options: "gemini" or "openai" - Choose which LLM provider to use
-  model_name: "gpt-4o-mini"  # For OpenAI: "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo" | GEMINI: "gemini-2.5-flash"
-  temperature: 0.7
+  model_name: "gpt-5-nano"  # OpenAI: "gpt-5-nano" (temp fixed to 1), "gpt-4o-mini", "gpt-4o" | GEMINI: "gemini-2.5-flash"
+  temperature: 0.7  # Ignored for gpt-5-nano (API only allows 1)
   max_retries: 3
   retry_delay: 2
   rate_limit_delay: 0  # No rate limiting for OpenAI (was 13 for Gemini free tier)
