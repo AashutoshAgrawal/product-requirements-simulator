@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { InputForm } from './components/InputForm';
 import { ProgressDashboard } from './components/ProgressDashboard';
 import { ResultsView } from './components/ResultsView';
+import { PastRunsView } from './components/PastRunsView';
 import { ReproducibilityInputForm } from './components/ReproducibilityInputForm';
 import { ReproducibilityProgress } from './components/ReproducibilityProgress';
 import { ReproducibilityView, ReproducibilityResults } from './components/ReproducibilityView';
@@ -9,7 +10,7 @@ import { submitAnalysis, ProgressData, getResults, startReproducibilityTest } fr
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 
-type AppState = 'input' | 'progress' | 'results' | 'repro-input' | 'repro-progress' | 'repro-results';
+type AppState = 'input' | 'progress' | 'results' | 'past-runs' | 'repro-input' | 'repro-progress' | 'repro-results';
 
 export default function App() {
   const [state, setState] = useState<AppState>('input');
@@ -99,12 +100,23 @@ export default function App() {
     setState('input');
   };
 
+  const handleViewPastRuns = () => {
+    setState('past-runs');
+  };
+
+  const handleOpenPastRun = useCallback((data: ProgressData) => {
+    setResultsData(data);
+    setState('results');
+    setJobId(null);
+  }, []);
+
   return (
     <>
       {state === 'input' && (
         <InputForm 
           onSubmit={handleStartAnalysis} 
           onReproducibilityTest={handleGoToReproTest}
+          onViewPastRuns={handleViewPastRuns}
         />
       )}
       
@@ -119,6 +131,14 @@ export default function App() {
         <ResultsView 
           data={resultsData}
           onStartNew={handleStartNew}
+          onViewPastRuns={handleViewPastRuns}
+        />
+      )}
+
+      {state === 'past-runs' && (
+        <PastRunsView 
+          onBack={handleBackToMain}
+          onOpenRun={handleOpenPastRun}
         />
       )}
 

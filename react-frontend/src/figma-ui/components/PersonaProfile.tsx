@@ -16,10 +16,20 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-// Avatar URL from DiceBear (person-style avatars); fallback to initials if image fails
-function getAvatarUrl(name: string): string {
-  const seed = encodeURIComponent(name || 'Agent');
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
+// Deterministic index 1–99 from name for consistent avatar per persona
+function hashToIndex(str: string): number {
+  const s = str || 'Agent';
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return (Math.abs(h) % 99) + 1;
+}
+
+// Real-person photo from randomuser.me (same name => same photo)
+function getAvatarUrl(agent: Agent): string {
+  const index = hashToIndex(agent.name);
+  const gender = (agent.gender || '').toLowerCase();
+  const folder = gender === 'female' ? 'women' : 'men';
+  return `https://randomuser.me/api/portraits/${folder}/${index}.jpg`;
 }
 
 export function PersonaProfile({ agent }: PersonaProfileProps) {
@@ -55,7 +65,7 @@ export function PersonaProfile({ agent }: PersonaProfileProps) {
             <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-background shadow-xl bg-primary/10 flex items-center justify-center">
               {showAvatar ? (
                 <img
-                  src={getAvatarUrl(agent.name)}
+                  src={getAvatarUrl(agent)}
                   alt={agent.name}
                   className="w-full h-full object-cover"
                   onError={() => setAvatarError(true)}

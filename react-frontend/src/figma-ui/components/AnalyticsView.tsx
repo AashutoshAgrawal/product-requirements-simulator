@@ -1,7 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
@@ -85,7 +84,7 @@ interface AnalyticsViewProps {
 }
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ analytics, agents }) => {
-  const { overview, stage_breakdown, agent_performance, api_calls, activity_log, extremes } = analytics;
+  const { overview, stage_breakdown, agent_performance, activity_log, extremes } = analytics;
 
   // Format currency
   const formatCost = (cost: number) => `$${cost.toFixed(4)}`;
@@ -109,7 +108,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ analytics, agents 
 
   // Calculate max duration for progress bars
   const maxDuration = Math.max(...agent_performance.map(a => a.total_duration));
-  const maxStageDuration = Math.max(...Object.values(stage_breakdown).map((s: any) => s.duration));
 
   // Get activity icon and color
   const getActivityIcon = (type: string) => {

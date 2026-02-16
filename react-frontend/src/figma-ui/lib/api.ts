@@ -115,6 +115,13 @@ export interface AnalyticsData {
   };
 }
 
+export interface RunInput {
+  product: string;
+  design_context: string;
+  n_agents: number;
+  pipeline_mode: string;
+}
+
 export interface ProgressData {
   status: 'processing' | 'completed' | 'completed_with_errors' | 'failed';
   progress: {
@@ -130,6 +137,7 @@ export interface ProgressData {
     interviews: Interview[];
     needs: Need[];
   };
+  run_input?: RunInput;
   analytics?: AnalyticsData;
 }
 
@@ -191,10 +199,6 @@ function parseExperience(experienceText: string, agentId: number): Experience {
 
   // Try to parse structured format with Step 1, Step 2, etc.
   // Pattern: **Step 1:** or **Step 1:** followed by Action/Observation/Challenge
-  const stepPattern = /\*\*Step\s+(\d+):?\*\*\s*\n-?\s*\*\*Action\*\*:\s*(.+?)(?=\n-?\s*\*\*Observation|\n-?\s*\*\*Challenge|\n\n|\*\*Step|$)/gs;
-  const obsPattern = /\*\*Observation\*\*:\s*(.+?)(?=\n-?\s*\*\*Challenge|\n\n|\*\*Step|$)/gs;
-  const challengePattern = /\*\*Challenge\*\*:\s*(.+?)(?=\n\n|\*\*Step|$)/gs;
-
   // Find all step numbers
   const stepNumbers: number[] = [];
   let stepMatch;
@@ -332,7 +336,8 @@ export async function getStatus(job_id: string): Promise<ProgressData> {
       message: response.data.progress?.message || 'Initializing...',
       completed: response.data.progress?.completed || false
     },
-    intermediate_results: intermediateResults
+    intermediate_results: intermediateResults,
+    run_input: response.data.run_input || undefined
   };
 }
 
@@ -386,12 +391,79 @@ export async function getResults(job_id: string): Promise<ProgressData | null> {
         interviews,
         needs: allNeeds
       },
+      run_input: response.data.run_input || undefined,
       analytics: results.analytics || undefined
     };
   } catch (error) {
     console.error('Error fetching results:', error);
     return null;
   }
+}
+
+// ==================== Saved runs (past runs) ====================
+
+export interface SavedRunMeta {
+  filename: string;
+  product: string;
+  design_context: string;
+  n_agents: number;
+  start_time: string;
+  duration_seconds: number;
+  total_needs: number;
+  mode: string;
+}
+
+export async function listSavedRuns(): Promise<SavedRunMeta[]> {
+  const response = await axios.get(`${API_BASE_URL}/api/runs`);
+  return response.data.runs || [];
+}
+
+export async function getSavedRun(filename: string): Promise<any> {
+  const response = await axios.get(`${API_BASE_URL}/api/runs/${encodeURIComponent(filename)}`);
+  return response.data;
+}
+
+/** Convert saved run JSON (from GET /api/runs/{filename}) to ProgressData for display */
+export function savedRunToProgressData(run: any): ProgressData {
+  const results = run;
+  let allNeeds: Need[] = [];
+  if (results.aggregated_needs?.categories) {
+    Object.values(results.aggregated_needs.categories).forEach((categoryNeeds: any) => {
+      allNeeds.push(...normalizeNeeds(categoryNeeds));
+    });
+  } else if (results.aggregated_needs?.all_needs) {
+    allNeeds = normalizeNeeds(results.aggregated_needs.all_needs);
+  }
+  const agents: Agent[] = (results.agents || []).map((agent: string, idx: number) => parseAgent(agent, idx));
+  const experiences: Experience[] = (results.experiences || []).map((exp: any) => {
+    if (typeof exp.experience === 'string') {
+      return parseExperience(exp.experience, exp.agent_id - 1);
+    }
+    return { agent_id: exp.agent_id - 1, steps: [] };
+  });
+  const interviews: Interview[] = (results.interviews || []).map((int: any) => ({
+    agent_id: int.agent_id - 1,
+    interview: int.interview || []
+  }));
+  const meta = results.metadata || {};
+  return {
+    status: 'completed',
+    progress: {
+      stage: 'completed',
+      stage_number: 4,
+      total_stages: 4,
+      message: 'Analysis complete!',
+      completed: true
+    },
+    intermediate_results: { agents, experiences, interviews, needs: allNeeds },
+    run_input: {
+      product: meta.product || '',
+      design_context: meta.design_context || '',
+      n_agents: meta.n_agents ?? 0,
+      pipeline_mode: meta.mode || 'sequential'
+    },
+    analytics: results.analytics
+  };
 }
 
 // ==================== Reproducibility Testing API ====================

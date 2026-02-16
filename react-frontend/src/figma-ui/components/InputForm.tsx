@@ -1,21 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Slider } from './ui/slider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Sparkles, History, Lightbulb, RefreshCw, Zap } from 'lucide-react';
+import { Sparkles, History, Lightbulb, RefreshCw, Zap, FileText } from 'lucide-react';
 
 const PROMPT_HISTORY_KEY = 'elicitron_prompt_history';
 const MAX_HISTORY_ITEMS = 10;
 
-// Fixed Quick Start suggestions - these never change
-const QUICK_START_SUGGESTIONS = [
+// Pool of 15 Quick Start ideas; we randomly show 3 each time
+const QUICK_START_POOL = [
   { product: 'Fitness Tracking App', context: 'A mobile app for tracking workouts, nutrition, and health metrics. Target users are health-conscious individuals aged 25-45 who want to maintain an active lifestyle.' },
   { product: 'Team Collaboration Tool', context: 'A web-based platform for remote teams to communicate, share files, and manage projects. Focus on small to medium businesses with distributed teams.' },
   { product: 'E-learning Platform', context: 'An online learning platform for professional skill development. Target users are working professionals looking to upskill in technology and business domains.' },
+  { product: 'Meal Planning App', context: 'An app that suggests weekly meal plans and grocery lists based on dietary preferences, allergies, and household size. Targets busy parents and health-conscious singles.' },
+  { product: 'Local Event Discovery', context: 'A mobile app for discovering concerts, meetups, and community events nearby. Target users are young professionals and students in urban areas.' },
+  { product: 'Budget & Savings Tracker', context: 'Personal finance app for tracking spending, setting goals, and visualizing savings. Aimed at millennials and first-time budgeters.' },
+  { product: 'Pet Care & Vet Reminders', context: 'App for pet owners to log vet visits, vaccinations, and medications with reminders. Targets dog and cat owners of all ages.' },
+  { product: 'Habit Tracker', context: 'Minimal daily habit tracker with streaks and simple analytics. For people building routines around exercise, reading, or mindfulness.' },
+  { product: 'Recipe Box & Grocery List', context: 'Save recipes from the web and generate shopping lists. For home cooks who want to reduce food waste and plan meals.' },
+  { product: 'Volunteer Matching Platform', context: 'Connects volunteers with local nonprofits and one-off opportunities. Targets retirees, students, and cause-driven professionals.' },
+  { product: 'Language Learning for Travel', context: 'Bite-sized lessons and phrasebooks for travelers. Focus on practical phrases for short trips rather than full fluency.' },
+  { product: 'Neighborhood Buy/Sell Marketplace', context: 'Hyperlocal classifieds for selling furniture, gear, and kids’ items. For people who prefer pickup over shipping.' },
+  { product: 'Meditation & Sleep Stories', context: 'Guided meditation and audio sleep stories for stress and insomnia. Targets stressed professionals and light sleepers.' },
+  { product: 'Running Route Planner', context: 'Plan and discover running routes by distance and terrain. For casual joggers and marathon trainers in cities.' },
+  { product: 'Freelancer Proposal Toolkit', context: 'Templates, tracking, and tips for freelancers writing proposals and managing client outreach. For solo consultants and gig workers.' },
 ];
+
+function pickRandomSuggestions<T>(pool: T[], count: number): T[] {
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
 
 interface PromptHistoryItem {
   product: string;
@@ -26,6 +43,7 @@ interface PromptHistoryItem {
 interface InputFormProps {
   onSubmit: (data: { product: string; design_context: string; n_agents: number; pipeline_mode: string }) => void;
   onReproducibilityTest?: () => void;
+  onViewPastRuns?: () => void;
 }
 
 function getPromptHistory(): PromptHistoryItem[] {
@@ -51,7 +69,9 @@ function savePromptToHistory(product: string, context: string): void {
   }
 }
 
-export function InputForm({ onSubmit, onReproducibilityTest }: InputFormProps) {
+const QUICK_START_COUNT = 3;
+
+export function InputForm({ onSubmit, onReproducibilityTest, onViewPastRuns }: InputFormProps) {
   const [product, setProduct] = useState('');
   const [designContext, setDesignContext] = useState('');
   const [nAgents, setNAgents] = useState([3]);
@@ -59,6 +79,11 @@ export function InputForm({ onSubmit, onReproducibilityTest }: InputFormProps) {
   const [promptHistory, setPromptHistory] = useState<PromptHistoryItem[]>([]);
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [filteredHistory, setFilteredHistory] = useState<PromptHistoryItem[]>([]);
+
+  const quickStartSuggestions = useMemo(
+    () => pickRandomSuggestions(QUICK_START_POOL, QUICK_START_COUNT),
+    []
+  );
 
   useEffect(() => {
     setPromptHistory(getPromptHistory());
@@ -135,7 +160,7 @@ export function InputForm({ onSubmit, onReproducibilityTest }: InputFormProps) {
               <div>
                 <Label className="text-sm text-muted-foreground mb-2 block">Quick Start</Label>
                 <div className="flex flex-wrap gap-2">
-                  {QUICK_START_SUGGESTIONS.map((suggestion, idx) => (
+                  {quickStartSuggestions.map((suggestion, idx) => (
                     <Button
                       key={idx}
                       type="button"
@@ -266,26 +291,37 @@ export function InputForm({ onSubmit, onReproducibilityTest }: InputFormProps) {
           </CardContent>
         </Card>
 
-        {/* Footer with discrete reproducibility test link */}
-        <div className="flex items-center justify-between mt-6 px-2">
+        {/* Footer: help text + Past runs / Reproducibility */}
+        <div className="flex items-center justify-between mt-6 px-2 flex-wrap gap-2">
           <p className="text-xs text-muted-foreground">
             Analysis typically takes 2-5 minutes depending on the number of personas
           </p>
-          {onReproducibilityTest && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                console.log('Reproducibility Test clicked');
-                onReproducibilityTest();
-              }}
-              className="text-xs text-muted-foreground hover:text-primary"
-            >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              Reproducibility Test
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {onViewPastRuns && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onViewPastRuns}
+                className="text-xs text-muted-foreground hover:text-primary"
+              >
+                <FileText className="h-3 w-3 mr-1" />
+                Past runs
+              </Button>
+            )}
+            {onReproducibilityTest && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onReproducibilityTest}
+                className="text-xs text-muted-foreground hover:text-primary"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Reproducibility Test
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

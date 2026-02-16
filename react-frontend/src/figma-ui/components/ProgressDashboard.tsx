@@ -19,7 +19,7 @@ const STAGES = ['Agent Generation', 'Experience Simulation', 'Interview', 'Need 
 
 export function ProgressDashboard({ jobId, onComplete }: ProgressDashboardProps) {
   const [progressData, setProgressData] = useState<ProgressData | null>(null);
-  const [prevCounts, setPrevCounts] = useState({
+  const [, setPrevCounts] = useState({
     agents: 0,
     experiences: 0,
     interviews: 0,

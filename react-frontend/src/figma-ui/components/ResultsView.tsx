@@ -1,5 +1,5 @@
 import { useState, useMemo, type ReactNode } from 'react';
-import { ProgressData, Agent, Experience, Interview, Need } from '../lib/api';
+import { ProgressData, Need } from '../lib/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -37,6 +37,7 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import { jsPDF } from 'jspdf';
 import { AnalyticsView } from './AnalyticsView';
 import { TreeView, TreeNodeData } from './TreeView';
 import { PersonaProfile } from './PersonaProfile';
@@ -44,9 +45,10 @@ import { PersonaProfile } from './PersonaProfile';
 interface ResultsViewProps {
   data: ProgressData;
   onStartNew: () => void;
+  onViewPastRuns?: () => void;
 }
 
-export function ResultsView({ data, onStartNew }: ResultsViewProps) {
+export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -104,30 +106,56 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
     });
   }, [needs, searchQuery, categoryFilter, priorityFilter]);
 
-  const handleDownload = () => {
-    const exportData = {
-      timestamp: new Date().toISOString(),
-      summary: {
-        total_agents: agents.length,
-        total_needs: needs.length,
-        needs_by_category: needsByCategory,
-        needs_by_priority: needsByPriority
-      },
-      agents,
-      experiences,
-      interviews,
-      needs
-    };
+  const runInput = data.run_input;
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `elicitron-results-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    let y = 20;
+    const lineHeight = 7;
+    const margin = 20;
+
+    doc.setFontSize(18);
+    doc.text('Elicitron – Requirements Report', margin, y);
+    y += lineHeight * 2;
+
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('Input', margin, y);
+    y += lineHeight;
+    doc.setFont(undefined, 'normal');
+    if (runInput) {
+      doc.text(`Product: ${runInput.product}`, margin, y);
+      y += lineHeight;
+      doc.text(`Design context: ${runInput.design_context}`, margin, y);
+      y += lineHeight;
+      doc.text(`Agents: ${runInput.n_agents}  |  Mode: ${runInput.pipeline_mode}`, margin, y);
+      y += lineHeight * 1.5;
+    } else {
+      doc.text('(Run input not available)', margin, y);
+      y += lineHeight * 1.5;
+    }
+
+    doc.setFont(undefined, 'bold');
+    doc.text(`Extracted needs (${needs.length})`, margin, y);
+    y += lineHeight;
+    doc.setFont(undefined, 'normal');
+
+    needs.forEach((need, i) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFontSize(10);
+      doc.text(`${i + 1}. [${need.category}] ${need.need_statement}`, margin, y);
+      y += lineHeight;
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`   Priority: ${need.priority}  |  Design: ${need.design_implication.substring(0, 80)}${need.design_implication.length > 80 ? '…' : ''}`, margin, y);
+      doc.setTextColor(0, 0, 0);
+      y += lineHeight * 1.2;
+    });
+
+    doc.save(`elicitron-report-${runInput?.product?.replace(/\s+/g, '-') || 'run'}-${Date.now()}.pdf`);
   };
 
   return (
@@ -142,11 +170,17 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
                 Generated {agents.length} personas and extracted {needs.length} latent needs
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={handleDownload} variant="outline">
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={handleDownloadPDF} variant="outline">
                 <Download className="w-4 h-4 mr-2" />
-                Export JSON
+                Download PDF Report
               </Button>
+              {onViewPastRuns && (
+                <Button onClick={onViewPastRuns} variant="outline">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Past runs
+                </Button>
+              )}
               <Button onClick={onStartNew}>
                 Start New Analysis
               </Button>
@@ -156,6 +190,38 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        {/* Run input (what was submitted for this run) */}
+        {runInput && (
+          <section>
+            <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Run input
+            </h2>
+            <Card className="bg-muted/20">
+              <CardContent className="pt-6">
+                <dl className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <dt className="font-medium text-muted-foreground">Product</dt>
+                    <dd className="mt-1">{runInput.product}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-muted-foreground">Design context</dt>
+                    <dd className="mt-1">{runInput.design_context}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-muted-foreground">Agents</dt>
+                    <dd className="mt-1">{runInput.n_agents}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-muted-foreground">Pipeline mode</dt>
+                    <dd className="mt-1">{runInput.pipeline_mode}</dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
         {/* Visual Summary: charts + narrative */}
         <section className="space-y-6">
           <h2 className="text-xl font-semibold flex items-center gap-2">

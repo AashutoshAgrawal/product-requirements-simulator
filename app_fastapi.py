@@ -27,7 +27,10 @@ import yaml
 # Load .env from project root so env vars are available even when terminal
 # "python.terminal.useEnvFile" is disabled (backend loads .env itself)
 _env_path = Path(__file__).resolve().parent / ".env"
-load_dotenv(dotenv_path=_env_path)
+try:
+    load_dotenv(dotenv_path=_env_path)
+except (PermissionError, OSError):
+    pass  # Continue without .env (e.g. missing file or permission)
 
 from src.llm.factory import create_llm_client
 from src.pipeline.pipeline import RequirementsPipeline
@@ -84,18 +87,27 @@ class JobResponse(BaseModel):
     message: str
 
 
+class RunInput(BaseModel):
+    product: str = ""
+    design_context: str = ""
+    n_agents: int = 0
+    pipeline_mode: str = "sequential"
+
+
 class JobStatusResponse(BaseModel):
     job_id: str
     status: str
     progress: Optional[dict] = None
     error: Optional[str] = None
-    intermediate_results: Optional[dict] = None  # Agents, experiences, interviews, needs as they're generated
+    intermediate_results: Optional[dict] = None
+    run_input: Optional[RunInput] = None
 
 
 class ResultsResponse(BaseModel):
     job_id: str
     status: str
     results: Optional[dict] = None
+    run_input: Optional[RunInput] = None
 
 
 class ReproducibilityRequest(BaseModel):
@@ -548,12 +560,21 @@ async def get_status(job_id: str):
     
     job = jobs[job_id]
     
+    run_input = None
+    if job.get("product") is not None:
+        run_input = RunInput(
+            product=job.get("product", ""),
+            design_context=job.get("design_context", ""),
+            n_agents=job.get("n_agents", 0),
+            pipeline_mode=job.get("pipeline_mode", "sequential")
+        )
     return JobStatusResponse(
         job_id=job_id,
         status=job["status"],
         progress=job.get("progress"),
         error=job.get("error"),
-        intermediate_results=job.get("intermediate_results")
+        intermediate_results=job.get("intermediate_results"),
+        run_input=run_input
     )
 
 
@@ -573,11 +594,76 @@ async def get_results(job_id: str):
             detail=f"Job not completed. Current status: {job['status']}"
         )
     
+    run_input = None
+    if job.get("product") is not None:
+        run_input = RunInput(
+            product=job.get("product", ""),
+            design_context=job.get("design_context", ""),
+            n_agents=job.get("n_agents", 0),
+            pipeline_mode=job.get("pipeline_mode", "sequential")
+        )
     return ResultsResponse(
         job_id=job_id,
         status=job["status"],
-        results=job.get("results")
+        results=job.get("results"),
+        run_input=run_input
     )
+
+
+# ==================== Saved runs (past runs from results/ directory) ====================
+
+RESULTS_DIR = Path("results")
+
+
+@app.get("/api/runs")
+async def list_saved_runs():
+    """
+    List saved pipeline runs (from results/*.json). Returns metadata for each run.
+    """
+    if not RESULTS_DIR.exists():
+        return {"runs": []}
+    runs = []
+    for path in sorted(RESULTS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+            meta = data.get("metadata", {})
+            agg = data.get("aggregated_needs", {}) or {}
+            if isinstance(agg.get("total_needs"), (int, float)):
+                total_needs = int(agg["total_needs"])
+            else:
+                total_needs = sum(len(v) if isinstance(v, list) else 0 for v in (agg.get("categories") or {}).values())
+            runs.append({
+                "filename": path.name,
+                "product": meta.get("product", ""),
+                "design_context": meta.get("design_context", "")[:100] + ("..." if len(meta.get("design_context", "")) > 100 else ""),
+                "n_agents": meta.get("n_agents", 0),
+                "start_time": meta.get("start_time", ""),
+                "duration_seconds": meta.get("duration_seconds", 0),
+                "total_needs": total_needs,
+                "mode": meta.get("mode", "sequential"),
+            })
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Could not read run {path.name}: {e}")
+            continue
+    return {"runs": runs}
+
+
+@app.get("/api/runs/{filename}")
+async def get_saved_run(filename: str):
+    """
+    Get a single saved run by filename (e.g. pipeline_results_20260201_120000.json).
+    """
+    if ".." in filename or "/" in filename or "\\" in filename or not filename.endswith(".json") or not filename.startswith("pipeline_results_"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    path = RESULTS_DIR / filename
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Run not found")
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        raise HTTPException(status_code=500, detail=f"Could not read run: {e}")
 
 
 class EditRequest(BaseModel):
