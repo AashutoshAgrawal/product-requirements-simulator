@@ -24,6 +24,19 @@ import {
 } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from 'recharts';
 import { AnalyticsView } from './AnalyticsView';
 import { TreeView, TreeNodeData } from './TreeView';
 import { PersonaProfile } from './PersonaProfile';
@@ -55,6 +68,26 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
     });
     return counts;
   }, [needs]);
+
+  // Chart data for visual summary
+  const categoryChartData = useMemo(
+    () =>
+      Object.entries(needsByCategory)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count),
+    [needsByCategory]
+  );
+  const priorityChartData = useMemo(
+    () =>
+      ['High', 'Medium', 'Low']
+        .filter(p => (needsByPriority[p] ?? 0) > 0)
+        .map(priority => ({
+          name: priority,
+          value: needsByPriority[priority] ?? 0
+        })),
+    [needsByPriority]
+  );
+  const PRIORITY_COLORS = { High: '#dc2626', Medium: '#ea580c', Low: '#6b7280' };
 
   // Filter needs
   const filteredNeeds = useMemo(() => {
@@ -123,6 +156,85 @@ export function ResultsView({ data, onStartNew }: ResultsViewProps) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        {/* Visual Summary: charts + narrative */}
+        <section className="space-y-6">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            Visual Summary
+          </h2>
+          <Card className="bg-muted/30 border-2 border-primary/10">
+            <CardContent className="pt-6">
+              <p className="text-muted-foreground leading-relaxed">
+                From <strong>{agents.length}</strong> user persona{agents.length !== 1 ? 's' : ''}, we simulated{' '}
+                <strong>{experiences.length}</strong> experience{experiences.length !== 1 ? 's' : ''} and{' '}
+                <strong>{interviews.length}</strong> interview{interviews.length !== 1 ? 's' : ''}, and extracted{' '}
+                <strong>{needs.length}</strong> latent need{needs.length !== 1 ? 's' : ''} across{' '}
+                <strong>{Object.keys(needsByCategory).length}</strong> categories. Below is the distribution by category and priority.
+              </p>
+            </CardContent>
+          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Needs by Category</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Distribution of extracted needs across categories
+                </p>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {categoryChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={categoryChartData} margin={{ top: 8, right: 8, left: 8, bottom: 24 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={categoryChartData.length > 4 ? -25 : 0} textAnchor={categoryChartData.length > 4 ? 'end' : 'middle'} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                      <Tooltip contentStyle={{ borderRadius: 8 }} />
+                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Needs" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">No category data</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Needs by Priority</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  High, medium, and low priority breakdown
+                </p>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {priorityChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={priorityChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={90}
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                        {priorityChartData.map((entry, index) => (
+                          <Cell key={entry.name} fill={PRIORITY_COLORS[entry.name as keyof typeof PRIORITY_COLORS] ?? '#6b7280'} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: 8 }} formatter={(value: number) => [value, 'Needs']} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">No priority data</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <Separator />
+
         {/* Executive Summary */}
         <section>
           <h2 className="mb-4">Executive Summary</h2>
