@@ -24,15 +24,15 @@ Analyze this response and extract latent needs according to the following criter
 
 2. **Need Statement**: Express the need as: "[User type] needs [capability] so that [benefit/outcome]"
 
-3. **Evidence**: Quote the specific part of the answer that reveals this need
-
-4. **Priority**: Rate as High, Medium, or Low based on:
+3. **Priority**: Rate as High, Medium, or Low based on:
    - Frequency of mention
    - Intensity of emotion
    - Impact on user success
    - Alignment with core product purpose
 
-5. **Design Implication**: Suggest one concrete design or feature improvement
+4. **Design Implication**: Suggest one concrete design or feature improvement
+
+Extract at most 3 distinct latent needs from this response. Focus on non-obvious, latent needs — not surface-level restatements of what the user said directly. If fewer than 3 distinct needs exist, return fewer.
 
 Provide your analysis in the following JSON format:
 
@@ -42,14 +42,11 @@ Provide your analysis in the following JSON format:
     {{
       "category": "<category>",
       "need_statement": "<statement>",
-      "evidence": "<quote>",
       "priority": "<High|Medium|Low>",
       "design_implication": "<suggestion>"
     }}
   ]
 }}
 ```
-
-Extract all identifiable needs from the response. If multiple needs are present, include them all in the array.
 
 Your analysis:

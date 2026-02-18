@@ -277,9 +277,15 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
                 "needs": []
             }
             
-            # Extract needs for intermediate display
-            for extraction in results.get("need_extractions", []):
-                jobs[job_id]["intermediate_results"]["needs"].extend(extraction.get("needs", []))
+            # Use synthesized needs for intermediate display (8-12 unique needs)
+            aggregated = results.get("aggregated_needs", {})
+            synthesized = aggregated.get("synthesized_needs", [])
+            if synthesized:
+                jobs[job_id]["intermediate_results"]["needs"] = synthesized
+            else:
+                # Fallback to raw if synthesis not available
+                for extraction in results.get("need_extractions", []):
+                    jobs[job_id]["intermediate_results"]["needs"].extend(extraction.get("needs", []))
             
             # Update job with results
             jobs[job_id]["status"] = results["metadata"].get("status", "completed")
@@ -417,17 +423,25 @@ async def run_pipeline_async(job_id: str, product_idea: str, design_context: str
             interviews
         )
         
-        # Store intermediate results (flatten needs for easier display)
-        all_needs = []
-        for extraction in need_extractions:
-            all_needs.extend(extraction.get("needs", []))
-        jobs[job_id]["intermediate_results"]["needs"] = all_needs
-        
-        # Aggregate results
+        # Aggregate needs
         aggregated_needs = await asyncio.to_thread(
             pipeline.need_extractor.aggregate_needs,
             need_extractions
         )
+        
+        # Synthesize needs (deduplicate to 8-12 unique)
+        synthesized_needs = await asyncio.to_thread(
+            pipeline.need_extractor.synthesize_needs,
+            aggregated_needs.get("all_needs", []),
+            product_idea
+        )
+        
+        # Update aggregated_needs with synthesized list
+        aggregated_needs["synthesized_needs"] = synthesized_needs
+        aggregated_needs["total_synthesized"] = len(synthesized_needs)
+        
+        # Use synthesized needs for intermediate display (8-12 unique needs)
+        jobs[job_id]["intermediate_results"]["needs"] = synthesized_needs if synthesized_needs else aggregated_needs.get("all_needs", [])
         
         # Get analytics summary
         analytics_summary = analytics.get_summary()

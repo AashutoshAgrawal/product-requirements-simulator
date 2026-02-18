@@ -33,7 +33,7 @@ export function ReproducibilityInputForm({ onSubmit, onBack }: ReproducibilityIn
     e.preventDefault();
     console.log('Form submitted', { product, designContext, nAgents: nAgents[0], nIterations: nIterations[0] });
     if (product.trim() && designContext.trim()) {
-      console.log('Calling onSubmit...');
+      console.log('Calling onSubmit');
       onSubmit({
         product: product.trim(),
         design_context: designContext.trim(),
@@ -120,7 +120,7 @@ export function ReproducibilityInputForm({ onSubmit, onBack }: ReproducibilityIn
                 <Label htmlFor="context">Design Context</Label>
                 <Textarea
                   id="context"
-                  placeholder="Describe the product and target users..."
+                  placeholder="Describe the product and target users"
                   value={designContext}
                   onChange={(e) => setDesignContext(e.target.value)}
                   rows={3}

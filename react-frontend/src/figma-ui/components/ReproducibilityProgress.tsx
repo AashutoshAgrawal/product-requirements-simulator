@@ -112,7 +112,7 @@ export function ReproducibilityProgress({ jobId, onComplete }: ReproducibilityPr
                 : 'Running Reproducibility Test'}
             </CardTitle>
             <CardDescription className="text-base">
-              {error || progress?.message || 'Initializing test...'}
+              {error || progress?.message || 'Initializing test'}
             </CardDescription>
           </CardHeader>
 
@@ -156,7 +156,7 @@ export function ReproducibilityProgress({ jobId, onComplete }: ReproducibilityPr
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Current Stage</span>
                 <span className="font-semibold text-primary">
-                  {stageDisplayNames[progress?.stage || 'queued'] || progress?.stage_name || 'Waiting...'}
+                  {stageDisplayNames[progress?.stage || 'queued'] || progress?.stage_name || 'Waiting'}
                 </span>
               </div>
 
@@ -233,7 +233,7 @@ export function ReproducibilityProgress({ jobId, onComplete }: ReproducibilityPr
             <div className="flex justify-between items-center text-sm pt-2 border-t border-border">
               <span className="text-muted-foreground">Job ID</span>
               <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
-                {jobId.slice(0, 8)}...{jobId.slice(-4)}
+                {jobId}
               </span>
             </div>
 

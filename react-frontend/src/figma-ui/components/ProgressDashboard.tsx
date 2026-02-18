@@ -69,7 +69,7 @@ export function ProgressDashboard({ jobId, onComplete }: ProgressDashboardProps)
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Initializing analysis...</p>
+          <p className="text-muted-foreground">Initializing analysis</p>
         </div>
       </div>
     );
@@ -84,6 +84,32 @@ export function ProgressDashboard({ jobId, onComplete }: ProgressDashboardProps)
       {/* Header */}
       <div className="bg-card border-b border-border sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-6">
+          {/* User Input Display */}
+          {progressData.run_input && (
+            <Card className="mb-6 bg-muted/30 border-primary/20">
+              <CardContent className="pt-4 pb-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Your Input</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="font-medium text-muted-foreground">Product: </span>
+                    <span>{progressData.run_input.product}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-muted-foreground">Context: </span>
+                    <span className="whitespace-pre-wrap break-words">{progressData.run_input.design_context}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-muted-foreground">Agents: </span>
+                    <span>{progressData.run_input.n_agents}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-muted-foreground">Mode: </span>
+                    <span>{progressData.run_input.pipeline_mode}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <div className="text-center mb-6">
             <h2 className="mb-2">Analysis in Progress</h2>
             <p className="text-sm text-muted-foreground">{progress.message}</p>
@@ -134,7 +160,12 @@ export function ProgressDashboard({ jobId, onComplete }: ProgressDashboardProps)
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {intermediate_results.experiences.map((exp, idx) => (
-                <ExperienceCard key={`exp-${exp.agent_id}`} experience={exp} index={idx} />
+                <ExperienceCard 
+                  key={`exp-${exp.agent_id}`} 
+                  experience={exp} 
+                  index={idx}
+                  agents={intermediate_results.agents}
+                />
               ))}
             </div>
           </section>
@@ -160,7 +191,7 @@ export function ProgressDashboard({ jobId, onComplete }: ProgressDashboardProps)
                     <span className="ml-2 font-medium">
                       {intermediate_results.interviews[intermediate_results.interviews.length - 1].interview[
                         intermediate_results.interviews[intermediate_results.interviews.length - 1].interview.length - 1
-                      ]?.question || 'Conducting interview...'}
+                      ]?.question || 'Conducting interview'}
                     </span>
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -200,7 +231,7 @@ export function ProgressDashboard({ jobId, onComplete }: ProgressDashboardProps)
             <CardContent className="py-12 text-center">
               <Loader2 className="w-12 h-12 animate-spin text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">
-                Generating user personas...
+                Generating user personas
               </p>
             </CardContent>
           </Card>

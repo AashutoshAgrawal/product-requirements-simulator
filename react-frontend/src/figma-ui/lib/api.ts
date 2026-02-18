@@ -46,11 +46,10 @@ export interface Interview {
 export interface Need {
   category: 'Functional' | 'Usability' | 'Performance' | 'Safety' | 'Emotional' | 'Social' | 'Accessibility';
   need_statement: string;
-  evidence: string;
   priority: 'High' | 'Medium' | 'Low';
   design_implication: string;
   agent_id?: number;
-  question?: string;
+  question_index?: number;
 }
 
 export interface AnalyticsData {
@@ -148,7 +147,8 @@ export interface JobResponse {
 
 // Parse bullet list after a section (lines starting with - or •)
 function parseBulletSection(text: string, header: string): string[] {
-  const regex = new RegExp(`\\*\\*${header}\\*\\*:\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*|$)`, 'i');
+  // Allow optional ":" and any extra header text (e.g. "**Motivations** (3–6 words each):")
+  const regex = new RegExp(`\\*\\*${header}\\*\\*[^\\n]*\\n([\\s\\S]*?)(?=\\n\\*\\*|$)`, 'i');
   const match = text.match(regex);
   if (!match) return [];
   const block = match[1].trim();
@@ -197,36 +197,42 @@ function parseExperience(experienceText: string, agentId: number): Experience {
     return { agent_id: agentId, steps: [] };
   }
 
-  // Try to parse structured format with Step 1, Step 2, etc.
-  // Pattern: **Step 1:** or **Step 1:** followed by Action/Observation/Challenge
-  // Find all step numbers
-  const stepNumbers: number[] = [];
-  let stepMatch;
-  const stepRegex = /\*\*Step\s+(\d+):?\*\*/g;
-  while ((stepMatch = stepRegex.exec(experienceText)) !== null) {
-    stepNumbers.push(parseInt(stepMatch[1]));
+  // Parse structured format with Step 1/2 headers
+  // Handle both "**Step 1:**" and "Step 1:" formats
+  const stepMatches: Array<{ step: number; index: number }> = [];
+  const stepRegex = /(?:Step\s+(\d+):|\*\*Step\s+(\d+):?\*\*)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = stepRegex.exec(experienceText)) !== null) {
+    const stepNum = parseInt(m[1] || m[2], 10);
+    stepMatches.push({ step: stepNum, index: m.index });
   }
 
-  // Parse each step
-  for (let i = 0; i < stepNumbers.length; i++) {
-    const stepNum = stepNumbers[i];
-    const nextStepNum = stepNumbers[i + 1];
-
-    // Extract section for this step
-    const stepStart = experienceText.indexOf(`**Step ${stepNum}**`);
-    const stepEnd = nextStepNum ? experienceText.indexOf(`**Step ${nextStepNum}**`) : experienceText.length;
+  for (let i = 0; i < stepMatches.length; i++) {
+    const stepNum = stepMatches[i].step;
+    const stepStart = stepMatches[i].index;
+    const stepEnd = stepMatches[i + 1] ? stepMatches[i + 1].index : experienceText.length;
     const stepSection = experienceText.substring(stepStart, stepEnd);
 
-    // Extract Action
-    const actionMatch = stepSection.match(/\*\*Action\*\*:\s*(.+?)(?=\n-?\s*\*\*Observation|\n-?\s*\*\*Challenge|\n\n|$)/s);
+    // Extract Action - handle both "**Action**:" and "- Action:" formats
+    // Match until Observation, Challenge, or end of step
+    let actionMatch = stepSection.match(/\*\*Action\*\*:\s*(.+?)(?=\s*-?\s*\*\*Observation|\s*-?\s*\*\*Challenge|\s*-?\s*Observation|\s*-?\s*Challenge|\s*Step\s+\d+:|$)/s);
+    if (!actionMatch) {
+      actionMatch = stepSection.match(/-?\s*Action:\s*(.+?)(?=\s*-?\s*\*\*Observation|\s*-?\s*\*\*Challenge|\s*-?\s*Observation|\s*-?\s*Challenge|\s*Step\s+\d+:|$)/s);
+    }
     const action = actionMatch ? actionMatch[1].trim() : '';
 
-    // Extract Observation
-    const obsMatch = stepSection.match(/\*\*Observation\*\*:\s*(.+?)(?=\n-?\s*\*\*Challenge|\n\n|$)/s);
+    // Extract Observation - handle both formats
+    let obsMatch = stepSection.match(/\*\*Observation\*\*:\s*(.+?)(?=\s*-?\s*\*\*Challenge|\s*-?\s*Challenge|\s*Step\s+\d+:|$)/s);
+    if (!obsMatch) {
+      obsMatch = stepSection.match(/-?\s*Observation:\s*(.+?)(?=\s*-?\s*\*\*Challenge|\s*-?\s*Challenge|\s*Step\s+\d+:|$)/s);
+    }
     const observation = obsMatch ? obsMatch[1].trim() : '';
 
-    // Extract Challenge
-    const challengeMatch = stepSection.match(/\*\*Challenge\*\*:\s*(.+?)(?=\n\n|$)/s);
+    // Extract Challenge - handle both formats
+    let challengeMatch = stepSection.match(/\*\*Challenge\*\*:\s*(.+?)(?=\s*Step\s+\d+:|$)/s);
+    if (!challengeMatch) {
+      challengeMatch = stepSection.match(/-?\s*Challenge:\s*(.+?)(?=\s*Step\s+\d+:|$)/s);
+    }
     const challenge = challengeMatch ? challengeMatch[1].trim() : '';
 
     if (action || observation || challenge) {
@@ -243,7 +249,7 @@ function parseExperience(experienceText: string, agentId: number): Experience {
   if (steps.length === 0) {
     steps.push({
       step: 1,
-      action: experienceText.substring(0, 500),
+      action: experienceText,
       observation: '',
       challenge: ''
     });
@@ -260,11 +266,10 @@ function normalizeNeeds(needs: any[]): Need[] {
   return needs.map((need, idx) => ({
     category: need.category || 'Functional',
     need_statement: need.need_statement || '',
-    evidence: need.evidence || '',
     priority: need.priority || 'Medium',
     design_implication: need.design_implication || '',
     agent_id: need.agent_id,
-    question: need.question
+    question_index: need.question_index
   }));
 }
 
@@ -333,7 +338,7 @@ export async function getStatus(job_id: string): Promise<ProgressData> {
       stage: response.data.progress?.stage || 'initializing',
       stage_number: response.data.progress?.stage_number || 0,
       total_stages: response.data.progress?.total_stages || 4,
-      message: response.data.progress?.message || 'Initializing...',
+      message: response.data.progress?.message || 'Initializing',
       completed: response.data.progress?.completed || false
     },
     intermediate_results: intermediateResults,

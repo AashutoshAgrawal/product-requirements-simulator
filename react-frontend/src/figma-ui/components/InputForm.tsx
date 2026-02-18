@@ -204,8 +204,8 @@ export function InputForm({ onSubmit, onReproducibilityTest, onViewPastRuns }: I
                       >
                         <History className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div className="min-w-0">
-                          <div className="font-medium text-sm truncate">{item.product}</div>
-                          <div className="text-xs text-muted-foreground truncate">{item.context.substring(0, 60)}...</div>
+                          <div className="font-medium text-sm whitespace-normal break-words">{item.product}</div>
+                          <div className="text-xs text-muted-foreground whitespace-normal break-words">{item.context}</div>
                         </div>
                       </button>
                     ))}
@@ -218,7 +218,7 @@ export function InputForm({ onSubmit, onReproducibilityTest, onViewPastRuns }: I
                 <Label htmlFor="context">Design Context</Label>
                 <Textarea
                   id="context"
-                  placeholder="Describe your product, target users, and any specific areas you want to explore..."
+                  placeholder="Describe your product, target users, and any specific areas you want to explore"
                   value={designContext}
                   onChange={(e) => setDesignContext(e.target.value)}
                   rows={4}

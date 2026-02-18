@@ -1,0 +1,29 @@
+
+### need_synthesis.txt ###
+
+You are a senior product strategist synthesizing user research findings.
+
+Below are raw extracted needs from simulated user interviews for: {product}
+
+{raw_needs_json}
+
+Consolidate into the minimum set of distinct, non-overlapping needs. Rules:
+- Two needs are distinct only if they would require fundamentally different design solutions. If two needs could be addressed by the same feature, merge them.
+- Merge needs that describe the same underlying requirement even if raised by different agents. The output must be agent-agnostic — do not preserve per-agent attribution in synthesized needs.
+- Each need statement must follow the format: "[User type] needs [capability] so that [benefit]"
+- Assign each a single category: Functional, Usability, Performance, Safety, Emotional, Social, Accessibility
+- Assign priority: High, Medium, or Low
+- Provide one concrete design implication per need (max 25 words)
+
+Return ONLY the JSON array. No commentary, explanations, or preamble.
+
+```json
+[
+  {{
+    "category": "<category>",
+    "need_statement": "<statement>",
+    "priority": "<High|Medium|Low>",
+    "design_implication": "<one concrete suggestion, max 25 words>"
+  }}
+]
+```

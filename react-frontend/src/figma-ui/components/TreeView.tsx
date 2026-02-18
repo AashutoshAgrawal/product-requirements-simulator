@@ -56,7 +56,7 @@ function TreeNode({ node, defaultExpanded, level }: { node: TreeNodeData; defaul
 
           {node.icon && <div className="text-primary/70 flex-shrink-0">{node.icon}</div>}
 
-          <div className="flex-1 min-w-0 text-sm md:text-base truncate">
+          <div className="flex-1 min-w-0 text-sm md:text-base whitespace-normal break-words">
             {node.label}
           </div>
 

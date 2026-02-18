@@ -174,11 +174,8 @@ export function PersonaProfile({ agent }: PersonaProfileProps) {
           <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mb-1">
             System Reasoning
           </p>
-          <p className="text-sm text-muted-foreground italic truncate" title={agent.reasoning}>
-            {(() => {
-              const first = agent.reasoning.split(/[.!]/)[0]?.trim().replace(/\s+/g, ' ');
-              return (first && first.length > 0 ? first + '.' : agent.reasoning.slice(0, 120).trim());
-            })()}
+          <p className="text-sm text-muted-foreground italic whitespace-pre-wrap break-words">
+            {agent.reasoning}
           </p>
         </div>
       )}

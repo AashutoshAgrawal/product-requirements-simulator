@@ -1,26 +1,15 @@
-import { useState, useMemo, type ReactNode } from 'react';
-import { ProgressData, Need } from '../lib/api';
+import { useState, useMemo } from 'react';
+import { ProgressData } from '../lib/api';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import {
   Download,
-  Search,
   User,
-  Activity,
   MessageSquare,
   Lightbulb,
   BarChart3,
   FileText,
-  Settings,
-  MousePointer2,
-  Zap,
-  Shield,
-  Heart,
-  Users,
-  Accessibility as AccessibilityIcon
 } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -48,10 +37,23 @@ interface ResultsViewProps {
   onViewPastRuns?: () => void;
 }
 
+// Helper to get avatar URL for an agent (same as PersonaProfile)
+function hashToIndex(str: string): number {
+  const s = str || 'Agent';
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return (Math.abs(h) % 99) + 1;
+}
+
+function getAvatarUrl(agent: { name: string; gender?: string }): string {
+  const index = hashToIndex(agent.name);
+  const gender = (agent.gender || '').toLowerCase();
+  const folder = gender === 'female' ? 'women' : 'men';
+  return `https://randomuser.me/api/portraits/${folder}/${index}.jpg`;
+}
+
 export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
   const { agents, experiences, interviews, needs } = data.intermediate_results;
 
   // Calculate summary statistics
@@ -91,20 +93,17 @@ export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewPro
   );
   const PRIORITY_COLORS = { High: '#dc2626', Medium: '#ea580c', Low: '#6b7280' };
 
-  // Filter needs
-  const filteredNeeds = useMemo(() => {
-    return needs.filter(need => {
-      const matchesSearch = searchQuery === '' ||
-        need.need_statement.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        need.evidence.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        need.design_implication.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesCategory = categoryFilter === 'all' || need.category === categoryFilter;
-      const matchesPriority = priorityFilter === 'all' || need.priority === priorityFilter;
-
-      return matchesSearch && matchesCategory && matchesPriority;
+  const toggleCard = (index: number) => {
+    setFlippedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
     });
-  }, [needs, searchQuery, categoryFilter, priorityFilter]);
+  };
 
   const runInput = data.run_input;
 
@@ -113,30 +112,37 @@ export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewPro
     let y = 20;
     const lineHeight = 7;
     const margin = 20;
+    // A4 width in mm (jsPDF default)
+    const pageWidth = 210;
+    const maxWidth = pageWidth - (margin * 2);
 
     doc.setFontSize(18);
-    doc.text('Elicitron – Requirements Report', margin, y);
+    doc.text('Elicitron – Requirements Report', margin, y, { maxWidth });
     y += lineHeight * 2;
 
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
-    doc.text('Input', margin, y);
+    doc.text('Input', margin, y, { maxWidth });
     y += lineHeight;
     doc.setFont(undefined, 'normal');
     if (runInput) {
-      doc.text(`Product: ${runInput.product}`, margin, y);
-      y += lineHeight;
-      doc.text(`Design context: ${runInput.design_context}`, margin, y);
-      y += lineHeight;
-      doc.text(`Agents: ${runInput.n_agents}  |  Mode: ${runInput.pipeline_mode}`, margin, y);
+      const productLines = doc.splitTextToSize(`Product: ${runInput.product}`, maxWidth);
+      doc.text(productLines, margin, y, { maxWidth });
+      y += lineHeight * productLines.length;
+      
+      const contextLines = doc.splitTextToSize(`Design context: ${runInput.design_context}`, maxWidth);
+      doc.text(contextLines, margin, y, { maxWidth });
+      y += lineHeight * contextLines.length;
+      
+      doc.text(`Agents: ${runInput.n_agents}  |  Mode: ${runInput.pipeline_mode}`, margin, y, { maxWidth });
       y += lineHeight * 1.5;
     } else {
-      doc.text('(Run input not available)', margin, y);
+      doc.text('(Run input not available)', margin, y, { maxWidth });
       y += lineHeight * 1.5;
     }
 
     doc.setFont(undefined, 'bold');
-    doc.text(`Extracted needs (${needs.length})`, margin, y);
+    doc.text(`Extracted needs (${needs.length})`, margin, y, { maxWidth });
     y += lineHeight;
     doc.setFont(undefined, 'normal');
 
@@ -146,13 +152,18 @@ export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewPro
         y = 20;
       }
       doc.setFontSize(10);
-      doc.text(`${i + 1}. [${need.category}] ${need.need_statement}`, margin, y);
-      y += lineHeight;
+      const needText = `${i + 1}. [${need.category}] ${need.need_statement}`;
+      const needLines = doc.splitTextToSize(needText, maxWidth);
+      doc.text(needLines, margin, y, { maxWidth });
+      y += lineHeight * needLines.length;
+      
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
-      doc.text(`   Priority: ${need.priority}  |  Design: ${need.design_implication.substring(0, 80)}${need.design_implication.length > 80 ? '…' : ''}`, margin, y);
+      const detailText = `   Priority: ${need.priority}  |  Design: ${need.design_implication}`;
+      const detailLines = doc.splitTextToSize(detailText, maxWidth);
+      doc.text(detailLines, margin, y, { maxWidth });
       doc.setTextColor(0, 0, 0);
-      y += lineHeight * 1.2;
+      y += lineHeight * detailLines.length + lineHeight * 0.2;
     });
 
     doc.save(`elicitron-report-${runInput?.product?.replace(/\s+/g, '-') || 'run'}-${Date.now()}.pdf`);
@@ -192,12 +203,12 @@ export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewPro
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
         {/* Run input (what was submitted for this run) */}
         {runInput && (
-          <section>
+          <section className="border-2 border-border rounded-lg p-6 bg-card">
             <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
               <FileText className="w-5 h-5 text-primary" />
               Run input
             </h2>
-            <Card className="bg-muted/20">
+            <Card className="bg-muted/20 border-2">
               <CardContent className="pt-6">
                 <dl className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
@@ -222,87 +233,8 @@ export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewPro
           </section>
         )}
 
-        {/* Visual Summary: charts + narrative */}
-        <section className="space-y-6">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            Visual Summary
-          </h2>
-          <Card className="bg-muted/30 border-2 border-primary/10">
-            <CardContent className="pt-6">
-              <p className="text-muted-foreground leading-relaxed">
-                From <strong>{agents.length}</strong> user persona{agents.length !== 1 ? 's' : ''}, we simulated{' '}
-                <strong>{experiences.length}</strong> experience{experiences.length !== 1 ? 's' : ''} and{' '}
-                <strong>{interviews.length}</strong> interview{interviews.length !== 1 ? 's' : ''}, and extracted{' '}
-                <strong>{needs.length}</strong> latent need{needs.length !== 1 ? 's' : ''} across{' '}
-                <strong>{Object.keys(needsByCategory).length}</strong> categories. Below is the distribution by category and priority.
-              </p>
-            </CardContent>
-          </Card>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Needs by Category</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Distribution of extracted needs across categories
-                </p>
-              </CardHeader>
-              <CardContent className="pt-2">
-                {categoryChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={categoryChartData} margin={{ top: 8, right: 8, left: 8, bottom: 24 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={categoryChartData.length > 4 ? -25 : 0} textAnchor={categoryChartData.length > 4 ? 'end' : 'middle'} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                      <Tooltip contentStyle={{ borderRadius: 8 }} />
-                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Needs" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">No category data</div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Needs by Priority</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  High, medium, and low priority breakdown
-                </p>
-              </CardHeader>
-              <CardContent className="pt-2">
-                {priorityChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <PieChart>
-                      <Pie
-                        data={priorityChartData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={90}
-                        label={({ name, value }) => `${name}: ${value}`}
-                      >
-                        {priorityChartData.map((entry, index) => (
-                          <Cell key={entry.name} fill={PRIORITY_COLORS[entry.name as keyof typeof PRIORITY_COLORS] ?? '#6b7280'} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ borderRadius: 8 }} formatter={(value: number) => [value, 'Needs']} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">No priority data</div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        <Separator />
-
-        {/* Executive Summary */}
-        <section>
+        {/* Executive Summary (after run input) */}
+        <section className="border-2 border-border rounded-lg p-6 bg-card">
           <h2 className="mb-4">Executive Summary</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
@@ -376,30 +308,197 @@ export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewPro
         <Separator />
 
         {/* Detailed Results */}
-        <section>
+        <section className="border-2 border-border rounded-lg p-6 bg-card">
           <Tabs defaultValue="needs" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="needs">
                 <Lightbulb className="w-4 h-4 mr-2" />
                 Needs
-              </TabsTrigger>
-              <TabsTrigger value="analytics">
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Analytics
               </TabsTrigger>
               <TabsTrigger value="agents">
                 <User className="w-4 h-4 mr-2" />
                 Agents
               </TabsTrigger>
-              <TabsTrigger value="experiences">
-                <Activity className="w-4 h-4 mr-2" />
-                Experiences
-              </TabsTrigger>
               <TabsTrigger value="interviews">
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Interviews
               </TabsTrigger>
+              <TabsTrigger value="analytics">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Analytics
+              </TabsTrigger>
             </TabsList>
+
+            {/* Needs Tab: Flip cards */}
+            <TabsContent value="needs" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {needs.map((need, index) => {
+                  const isFlipped = flippedCards.has(index);
+                  const categoryColors: Record<string, string> = {
+                    Functional: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+                    Usability: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+                    Performance: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+                    Safety: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+                    Emotional: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
+                    Social: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+                    Accessibility: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+                  };
+                  const priorityColors: Record<string, string> = {
+                    High: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+                    Medium: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+                    Low: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+                  };
+                  return (
+                    <div
+                      key={index}
+                      className="relative h-48 cursor-pointer"
+                      style={{ perspective: '1000px' }}
+                      onClick={() => toggleCard(index)}
+                    >
+                      <div
+                        className="relative w-full h-full transition-transform duration-500"
+                        style={{
+                          transformStyle: 'preserve-3d',
+                          transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                        }}
+                      >
+                        {/* Front: Need statement */}
+                        <div
+                          className="absolute inset-0 bg-card border-2 border-border rounded-lg p-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
+                          style={{ backfaceVisibility: 'hidden' }}
+                        >
+                          <div className="flex-1 flex flex-col justify-center">
+                            <p className="text-sm font-medium leading-relaxed">{need.need_statement}</p>
+                          </div>
+                          <div className="flex items-center gap-2 mt-3 flex-wrap">
+                            <Badge className={categoryColors[need.category] || 'bg-gray-100 text-gray-800'} variant="secondary">
+                              {need.category}
+                            </Badge>
+                            <Badge className={priorityColors[need.priority] || 'bg-gray-100 text-gray-800'} variant="secondary">
+                              {need.priority}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2 text-center">Click to flip</p>
+                        </div>
+                        {/* Back: Design implication */}
+                        <div
+                          className="absolute inset-0 bg-primary/5 border-2 border-primary/20 rounded-lg p-4 flex flex-col justify-center shadow-sm"
+                          style={{
+                            backfaceVisibility: 'hidden',
+                            transform: 'rotateY(180deg)',
+                          }}
+                        >
+                          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Design Implication</p>
+                          <p className="text-sm leading-relaxed">{need.design_implication}</p>
+                          <p className="text-xs text-muted-foreground mt-3 text-center">Click to flip back</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </TabsContent>
+
+            {/* Agents Tab: Persona-style tree */}
+            <TabsContent value="agents" className="space-y-4 mt-6">
+              <div className="bg-card border border-border rounded-lg p-4">
+                <TreeView
+                  data={agents.map((agent): TreeNodeData => {
+                    const avatarUrl = getAvatarUrl(agent);
+                    return {
+                      id: `agent-${agent.id}`,
+                      label: (
+                        <div className="flex items-center gap-3 py-1">
+                          <img
+                            src={avatarUrl}
+                            alt={agent.name}
+                            className="w-10 h-10 rounded-full border-2 border-primary/20 shrink-0 object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const fallback = target.nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                          <div className="w-10 h-10 rounded-full border-2 border-primary/20 bg-primary/5 shrink-0 hidden items-center justify-center text-sm font-bold text-primary">
+                            {agent.name.split(/\s+/).map((s) => s[0]).join('').toUpperCase().slice(0, 2)}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-base whitespace-normal break-words">{agent.name}</span>
+                            {(agent.occupation || agent.location) && (
+                              <span className="text-xs text-muted-foreground whitespace-normal break-words">
+                                {[agent.occupation, agent.location].filter(Boolean).join(' • ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ),
+                      content: (
+                        <div className="py-6 px-2 md:px-4">
+                          <PersonaProfile agent={agent} />
+                        </div>
+                      ),
+                    };
+                  })}
+                />
+              </div>
+            </TabsContent>
+
+            {/* Interviews Tab: Collapsible tree by agent, then Q&A */}
+            <TabsContent value="interviews" className="space-y-4 mt-6">
+              <div className="bg-card border border-border rounded-lg p-4">
+                <TreeView
+                  data={interviews.map((interview): TreeNodeData => {
+                    const agent = agents.find((a) => a.id === interview.agent_id);
+                    const avatarUrl = agent ? getAvatarUrl(agent) : '';
+                    return {
+                      id: `int-${interview.agent_id}`,
+                      label: (
+                        <div className="flex items-center gap-3 py-1">
+                          {avatarUrl && (
+                            <>
+                              <img
+                                src={avatarUrl}
+                                alt={agent?.name || `Agent ${interview.agent_id + 1}`}
+                                className="w-10 h-10 rounded-full border-2 border-primary/20 shrink-0 object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const fallback = target.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
+                              <div className="w-10 h-10 rounded-full border-2 border-primary/20 bg-primary/5 shrink-0 hidden items-center justify-center text-sm font-bold text-primary">
+                                {(agent?.name || `Agent ${interview.agent_id + 1}`).split(/\s+/).map((s) => s[0]).join('').toUpperCase().slice(0, 2)}
+                              </div>
+                            </>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-base whitespace-normal break-words">{agent?.name ?? `Agent ${interview.agent_id + 1}`}</span>
+                            {(agent?.occupation || agent?.location) && (
+                              <span className="text-xs text-muted-foreground whitespace-normal break-words">
+                                {[agent?.occupation, agent?.location].filter(Boolean).join(' • ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ),
+                      icon: <MessageSquare className="w-4 h-4" />,
+                      children: interview.interview.map((qa, idx): TreeNodeData => ({
+                        id: `int-${interview.agent_id}-qa-${idx}`,
+                        label: qa.question,
+                        content: (
+                          <div className="pl-2 border-l-2 border-primary/30 py-1">
+                            <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Answer</p>
+                            <p>{qa.answer}</p>
+                          </div>
+                        ),
+                      })),
+                    };
+                  })}
+                />
+              </div>
+            </TabsContent>
 
             {/* Analytics Tab */}
             <TabsContent value="analytics" className="mt-6">
@@ -416,192 +515,85 @@ export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewPro
                 </Card>
               )}
             </TabsContent>
-
-            {/* Needs Tab */}
-            <TabsContent value="needs" className="space-y-4 mt-6">
-              {/* Filters */}
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search needs..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filter by category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {Object.keys(needsByCategory).map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filter by priority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Priorities</SelectItem>
-                        <SelectItem value="High">High</SelectItem>
-                        <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="Low">Low</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Needs: Collapsible tree by category */}
-              <div className="bg-card border border-border rounded-lg p-4 min-h-[400px]">
-                {filteredNeeds.length > 0 ? (
-                  <TreeView
-                    data={(() => {
-                      const grouped: Record<string, Need[]> = {};
-                      filteredNeeds.forEach((need) => {
-                        if (!grouped[need.category]) grouped[need.category] = [];
-                        grouped[need.category].push(need);
-                      });
-                      const categoryIcons: Record<string, ReactNode> = {
-                        Functional: <Settings className="w-4 h-4" />,
-                        Usability: <MousePointer2 className="w-4 h-4" />,
-                        Performance: <Zap className="w-4 h-4" />,
-                        Safety: <Shield className="w-4 h-4" />,
-                        Emotional: <Heart className="w-4 h-4" />,
-                        Social: <Users className="w-4 h-4" />,
-                        Accessibility: <AccessibilityIcon className="w-4 h-4" />,
-                      };
-                      return Object.entries(grouped)
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([category, items]): TreeNodeData => ({
-                          id: `cat-${category}`,
-                          label: category,
-                          icon: categoryIcons[category] ?? <Lightbulb className="w-4 h-4" />,
-                          badge: <Badge variant="outline">{items.length}</Badge>,
-                          children: items.map((need, idx): TreeNodeData => ({
-                            id: `need-${category}-${idx}`,
-                            label: need.need_statement,
-                            badge: (
-                              <Badge
-                                className={
-                                  need.priority === 'High'
-                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                                    : need.priority === 'Medium'
-                                      ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-                                }
-                                variant="secondary"
-                              >
-                                {need.priority}
-                              </Badge>
-                            ),
-                            content: (
-                              <div className="space-y-4">
-                                <div>
-                                  <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Evidence</p>
-                                  <p className="italic">&ldquo;{need.evidence}&rdquo;</p>
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Design Implication</p>
-                                  <p>{need.design_implication}</p>
-                                </div>
-                              </div>
-                            ),
-                          })),
-                        }));
-                    })()}
-                  />
-                ) : (
-                  <div className="py-12 text-center text-muted-foreground">No needs match your filters</div>
-                )}
-              </div>
-            </TabsContent>
-
-            {/* Agents Tab: Persona-style tree */}
-            <TabsContent value="agents" className="space-y-4 mt-6">
-              <div className="bg-card border border-border rounded-lg p-4">
-                <TreeView
-                  data={agents.map((agent): TreeNodeData => ({
-                    id: `agent-${agent.id}`,
-                    label: (
-                      <div className="flex items-center gap-3 py-1">
-                        <div className="w-10 h-10 rounded-full border-2 border-primary/20 bg-primary/5 shrink-0 flex items-center justify-center text-sm font-bold text-primary">
-                          {agent.name.split(/\s+/).map((s) => s[0]).join('').toUpperCase().slice(0, 2)}
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-base truncate">{agent.name}</span>
-                          <span className="text-xs text-muted-foreground truncate">{agent.description.split('.')[0]}.</span>
-                        </div>
-                      </div>
-                    ),
-                    content: (
-                      <div className="py-6 px-2 md:px-4">
-                        <PersonaProfile agent={agent} />
-                      </div>
-                    ),
-                  }))}
-                />
-              </div>
-            </TabsContent>
-
-            {/* Experiences Tab: Collapsible tree by agent, then steps */}
-            <TabsContent value="experiences" className="space-y-4 mt-6">
-              <div className="bg-card border border-border rounded-lg p-4">
-                <TreeView
-                  data={experiences.map((exp): TreeNodeData => ({
-                    id: `exp-${exp.agent_id}`,
-                    label: agents.find((a) => a.id === exp.agent_id)?.name ?? `Agent ${exp.agent_id + 1}`,
-                    icon: <Activity className="w-4 h-4" />,
-                    children: exp.steps.map((step): TreeNodeData => ({
-                      id: `exp-${exp.agent_id}-step-${step.step}`,
-                      label: `Step ${step.step}: ${step.action.length > 80 ? step.action.slice(0, 80) + '…' : step.action}`,
-                      content: (
-                        <div className="space-y-3">
-                          <div>
-                            <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Observation</p>
-                            <p>{step.observation}</p>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Challenge Identified</p>
-                            <p className="text-destructive/90 dark:text-destructive font-medium">{step.challenge}</p>
-                          </div>
-                        </div>
-                      ),
-                    })),
-                  }))}
-                />
-              </div>
-            </TabsContent>
-
-            {/* Interviews Tab: Collapsible tree by agent, then Q&A */}
-            <TabsContent value="interviews" className="space-y-4 mt-6">
-              <div className="bg-card border border-border rounded-lg p-4">
-                <TreeView
-                  data={interviews.map((interview): TreeNodeData => ({
-                    id: `int-${interview.agent_id}`,
-                    label: agents.find((a) => a.id === interview.agent_id)?.name ?? `Agent ${interview.agent_id + 1}`,
-                    icon: <MessageSquare className="w-4 h-4" />,
-                    children: interview.interview.map((qa, idx): TreeNodeData => ({
-                      id: `int-${interview.agent_id}-qa-${idx}`,
-                      label: qa.question,
-                      content: (
-                        <div className="pl-2 border-l-2 border-primary/30 py-1">
-                          <p className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-1">Answer</p>
-                          <p>{qa.answer}</p>
-                        </div>
-                      ),
-                    })),
-                  }))}
-                />
-              </div>
-            </TabsContent>
           </Tabs>
+        </section>
+
+        <Separator />
+
+        {/* Visual Summary: charts at the very end */}
+        <section className="border-2 border-border rounded-lg p-6 bg-card space-y-6">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            Visual Summary
+          </h2>
+          <Card className="bg-muted/30 border-2 border-primary/10">
+            <CardContent className="pt-6">
+              <p className="text-muted-foreground leading-relaxed">
+                From <strong>{agents.length}</strong> user persona{agents.length !== 1 ? 's' : ''}, we conducted{' '}
+                <strong>{interviews.length}</strong> interview{interviews.length !== 1 ? 's' : ''}, and extracted{' '}
+                <strong>{needs.length}</strong> latent need{needs.length !== 1 ? 's' : ''} across{' '}
+                <strong>{Object.keys(needsByCategory).length}</strong> categories. Below is the distribution by category and priority.
+              </p>
+            </CardContent>
+          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Needs by Category</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Distribution of extracted needs across categories
+                </p>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {categoryChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={categoryChartData} margin={{ top: 8, right: 8, left: 8, bottom: 24 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={categoryChartData.length > 4 ? -25 : 0} textAnchor={categoryChartData.length > 4 ? 'end' : 'middle'} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                      <Tooltip contentStyle={{ borderRadius: 8 }} />
+                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Needs" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">No category data</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Needs by Priority</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  High, medium, and low priority breakdown
+                </p>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {priorityChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={priorityChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={90}
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                        {priorityChartData.map((entry, index) => (
+                          <Cell key={entry.name} fill={PRIORITY_COLORS[entry.name as keyof typeof PRIORITY_COLORS] ?? '#6b7280'} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: 8 }} formatter={(value: number) => [value, 'Needs']} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">No priority data</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </section>
       </div>
     </div>

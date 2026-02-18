@@ -91,7 +91,7 @@ export function PastRunsView({ onBack, onOpenRun }: PastRunsViewProps) {
               >
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center justify-between gap-2">
-                    <span className="truncate">{run.product || 'Untitled run'}</span>
+                    <span className="whitespace-normal break-words">{run.product || 'Untitled run'}</span>
                     {openingId === run.filename ? (
                       <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                     ) : null}
@@ -113,7 +113,7 @@ export function PastRunsView({ onBack, onOpenRun }: PastRunsViewProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <p className="text-sm text-muted-foreground line-clamp-2">
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
                     {run.design_context}
                   </p>
                 </CardContent>

@@ -389,18 +389,41 @@ class ParallelRequirementsPipeline(BasePipeline):
             
             # Aggregate needs
             aggregated_needs = self.need_extractor.aggregate_needs(need_extractions)
+            
+            # Synthesize needs: deduplicate and consolidate to 8-12 unique needs
+            synthesized_needs = self.need_extractor.synthesize_needs(aggregated_needs["all_needs"], product)
+            
+            # Update aggregated_needs with synthesized list (keep raw for traceability)
+            aggregated_needs["synthesized_needs"] = synthesized_needs
+            aggregated_needs["total_synthesized"] = len(synthesized_needs)
+            # Rebuild categories/priorities from synthesized needs
+            synth_categories = {}
+            synth_priorities = {"High": [], "Medium": [], "Low": []}
+            for need in synthesized_needs:
+                cat = need.get("category", "Unknown")
+                pri = need.get("priority", "Medium")
+                if cat not in synth_categories:
+                    synth_categories[cat] = []
+                synth_categories[cat].append(need)
+                if pri in synth_priorities:
+                    synth_priorities[pri].append(need)
+            aggregated_needs["synthesized_categories"] = synth_categories
+            aggregated_needs["synthesized_priorities"] = synth_priorities
+            aggregated_needs["synthesized_summary"] = {
+                "by_category": {cat: len(needs) for cat, needs in synth_categories.items()},
+                "by_priority": {pri: len(needs) for pri, needs in synth_priorities.items()}
+            }
+            
             results["aggregated_needs"] = aggregated_needs
             
-            # Flatten needs for intermediate results
-            all_needs = []
-            for extraction in need_extractions:
-                all_needs.extend(extraction.get("needs", []))
+            # Flatten synthesized needs for intermediate results (use synthesized, not raw)
+            all_needs = synthesized_needs
             
             # Send needs in progress callback
             if progress_callback:
                 progress_callback({
                     "stage": "need_extraction_complete",
-                    "message": f"Extracted {aggregated_needs['total_needs']} needs",
+                    "message": f"Extracted {aggregated_needs['total_needs']} raw needs, synthesized to {len(synthesized_needs)} unique needs",
                     "progress": 95,
                     "data": {"needs": all_needs}
                 })
@@ -408,7 +431,7 @@ class ParallelRequirementsPipeline(BasePipeline):
             stage_end = time.time()
             self.analytics.track_stage("need_extraction", stage_start, stage_end, aggregated_needs['total_needs'])
             
-            logger.info(f"✓ Extracted {aggregated_needs['total_needs']} total needs")
+            logger.info(f"✓ Extracted {aggregated_needs['total_needs']} raw needs, synthesized to {len(synthesized_needs)} unique needs")
             logger.info(f"  - Categories: {list(aggregated_needs['summary']['by_category'].keys())}")
             logger.info(f"  - High Priority: {aggregated_needs['summary']['by_priority'].get('High', 0)}")
         else:

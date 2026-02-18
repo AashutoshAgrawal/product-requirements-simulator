@@ -1,5 +1,5 @@
 import { Agent } from '../lib/api';
-import { User, Calendar, Users } from 'lucide-react';
+import { Calendar, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { motion } from 'framer-motion';
 
@@ -15,7 +15,23 @@ const genderConfig = {
   'Non-binary': { color: 'bg-purple-100 text-purple-700 border-purple-200' }
 };
 
+function hashToIndex(str: string): number {
+  const s = str || 'Agent';
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return (Math.abs(h) % 99) + 1;
+}
+
+function getAvatarUrl(agent: { name: string; gender?: string }): string {
+  const index = hashToIndex(agent.name);
+  const gender = (agent.gender || '').toLowerCase();
+  const folder = gender === 'female' ? 'women' : 'men';
+  return `https://randomuser.me/api/portraits/${folder}/${index}.jpg`;
+}
+
 export function AgentCard({ agent, index }: AgentCardProps) {
+  const avatarUrl = getAvatarUrl(agent);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -25,8 +41,21 @@ export function AgentCard({ agent, index }: AgentCardProps) {
       <Card className="h-full">
         <CardHeader className="pb-3">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <User className="w-5 h-5 text-primary" />
+            <img
+              src={avatarUrl}
+              alt={agent.name}
+              className="w-10 h-10 rounded-full object-cover border-2 border-primary/20 flex-shrink-0"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = 'flex';
+              }}
+            />
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 hidden">
+              <span className="text-xs font-bold text-primary">
+                {agent.name.split(/\s+/).map((s) => s[0]).join('').toUpperCase().slice(0, 2)}
+              </span>
             </div>
             <div className="flex-1 min-w-0">
               <CardTitle className="text-base">{agent.name}</CardTitle>

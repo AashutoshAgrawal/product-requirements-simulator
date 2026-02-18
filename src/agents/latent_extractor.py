@@ -8,6 +8,8 @@ latent user needs according to structured criteria.
 from typing import List, Dict, Any, Optional
 import os
 
+import json
+
 from ..llm.gemini_client import GeminiClient
 from ..utils.logger import get_logger
 from ..utils.json_parser import safe_parse_json
@@ -86,8 +88,13 @@ class LatentNeedExtractor:
         needs_data = safe_parse_json(response)
         
         if needs_data and "needs" in needs_data:
-            logger.debug(f"Extracted {len(needs_data['needs'])} needs")
-            return needs_data
+            # Cap at 3 needs per Q&A as safety net
+            needs_list = needs_data['needs'][:3]
+            # Remove 'evidence' field if present (prompt no longer includes it)
+            for need in needs_list:
+                need.pop("evidence", None)
+            logger.debug(f"Extracted {len(needs_list)} needs (capped at 3)")
+            return {"needs": needs_list}
         else:
             logger.warning("Failed to parse needs from response")
             return {"needs": [], "raw_response": response}
@@ -123,10 +130,14 @@ class LatentNeedExtractor:
                 agent_id=agent_id
             )
             
-            # Add metadata
+            # Add traceability metadata (agent_id and question_index) but NOT full Q&A text
             for need in needs_result.get("needs", []):
-                need["question"] = qa["question"]
-                need["answer"] = qa["answer"]
+                need["agent_id"] = agent_id
+                need["question_index"] = idx - 1  # 0-indexed
+                # Remove question/answer/evidence if present
+                need.pop("question", None)
+                need.pop("answer", None)
+                need.pop("evidence", None)
                 all_needs.append(need)
         
         logger.info(f"Extracted {len(all_needs)} total needs from interview")
@@ -199,16 +210,101 @@ class LatentNeedExtractor:
             if priority in priorities:
                 priorities[priority].append(need)
         
-        logger.info(f"Aggregated {len(all_needs)} total needs across {len(categories)} categories")
+        # Strip question/answer/evidence from all needs in aggregated output
+        cleaned_needs = []
+        for need in all_needs:
+            cleaned = {k: v for k, v in need.items() if k not in ["question", "answer", "evidence"]}
+            cleaned_needs.append(cleaned)
+        
+        # Clean categories and priorities too
+        cleaned_categories = {}
+        for cat, needs_list in categories.items():
+            cleaned_categories[cat] = [{k: v for k, v in n.items() if k not in ["question", "answer", "evidence"]} for n in needs_list]
+        
+        cleaned_priorities = {}
+        for pri, needs_list in priorities.items():
+            cleaned_priorities[pri] = [{k: v for k, v in n.items() if k not in ["question", "answer", "evidence"]} for n in needs_list]
+        
+        logger.info(f"Aggregated {len(cleaned_needs)} total needs across {len(cleaned_categories)} categories")
         
         return {
-            "total_needs": len(all_needs),
+            "total_needs": len(cleaned_needs),
             "total_agents": len(extraction_results),
-            "categories": categories,
-            "priorities": priorities,
-            "all_needs": all_needs,
+            "categories": cleaned_categories,
+            "priorities": cleaned_priorities,
+            "all_needs": cleaned_needs,
             "summary": {
-                "by_category": {cat: len(needs) for cat, needs in categories.items()},
-                "by_priority": {pri: len(needs) for pri, needs in priorities.items()}
+                "by_category": {cat: len(needs) for cat, needs in cleaned_categories.items()},
+                "by_priority": {pri: len(needs) for pri, needs in cleaned_priorities.items()}
             }
         }
+    
+    def synthesize_needs(
+        self,
+        raw_needs: List[Dict[str, Any]],
+        product: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Synthesize raw needs into 8-12 unique, deduplicated needs.
+        
+        Args:
+            raw_needs: List of raw need dictionaries (without Q&A text)
+            product: Product name for context
+            
+        Returns:
+            List of synthesized needs (count decided by LLM)
+        """
+        if not raw_needs:
+            logger.warning("No raw needs to synthesize")
+            return []
+        
+        logger.info(f"Synthesizing {len(raw_needs)} raw needs")
+        
+        # Load synthesis prompt template
+        template_path = os.path.join(
+            os.path.dirname(__file__),
+            "..", "llm", "prompts", "need_synthesis.txt"
+        )
+        
+        try:
+            with open(template_path, "r") as f:
+                synthesis_template = f.read()
+        except FileNotFoundError:
+            logger.error(f"Synthesis template not found at {template_path}")
+            # Fallback: return full list sorted by priority
+            sorted_needs = sorted(raw_needs, key=lambda n: {"High": 3, "Medium": 2, "Low": 1}.get(n.get("priority", "Medium"), 1), reverse=True)
+            return sorted_needs
+        
+        # Prepare raw needs JSON (only include core fields)
+        clean_needs = []
+        for need in raw_needs:
+            clean_needs.append({
+                "category": need.get("category", "Unknown"),
+                "need_statement": need.get("need_statement", ""),
+                "priority": need.get("priority", "Medium"),
+                "design_implication": need.get("design_implication", "")
+            })
+        
+        raw_needs_json = json.dumps(clean_needs, indent=2)
+        
+        prompt = synthesis_template.format(
+            product=product,
+            raw_needs_json=raw_needs_json
+        )
+        
+        response = self.llm_client.run(prompt, _stage="need_synthesis")
+        
+        # Parse JSON array response
+        synthesized = safe_parse_json(response)
+        
+        if isinstance(synthesized, list):
+            logger.info(f"Synthesized to {len(synthesized)} unique needs")
+            return synthesized
+        elif isinstance(synthesized, dict) and "needs" in synthesized:
+            result = synthesized["needs"]
+            logger.info(f"Synthesized to {len(result)} unique needs")
+            return result
+        else:
+            logger.warning("Failed to parse synthesis response, falling back to full list by priority")
+            sorted_needs = sorted(raw_needs, key=lambda n: {"High": 3, "Medium": 2, "Low": 1}.get(n.get("priority", "Medium"), 1), reverse=True)
+            return sorted_needs

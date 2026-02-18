@@ -10,11 +10,6 @@ Please answer the following question based on your experience and perspective as
 
 **Question**: {question}
 
-Provide a thoughtful, detailed answer that:
-- Stays true to your character and background
-- References specific moments from your experience
-- Explains your reasoning and feelings
-- Is honest about both positives and negatives
-- Provides actionable insights where relevant
+Answer in 3-5 sentences. Reference one specific moment from your experience. Be honest about positives and negatives. Do not use bullet points or headers.
 
 Your answer:

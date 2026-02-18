@@ -70,12 +70,6 @@ export function NeedCard({ need, index }: NeedCardProps) {
                 transition={{ duration: 0.2 }}
                 className="space-y-3 pt-2 border-t overflow-hidden"
               >
-                {need.evidence && (
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground mb-1">Evidence:</p>
-                    <p className="text-xs text-foreground/80 italic">{need.evidence}</p>
-                  </div>
-                )}
                 {need.design_implication && (
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-1">Design Implication:</p>

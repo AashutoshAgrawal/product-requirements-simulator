@@ -4,12 +4,12 @@ You are role-playing as the following user:
 
 Your task is to simulate a realistic interaction experience with a {product}.
 
-Generate exactly 3 steps of your interaction, from start to finish. For each step, provide:
+Generate exactly 2 steps of your interaction, from start to finish. For each step, provide:
 
 **Step [number]:**
-- **Action**: What you do in this step (be specific and realistic)
-- **Observation**: What you notice, feel, or experience as a result
-- **Challenge**: Any difficulty, friction, confusion, or concern you encounter
+- **Action**: What you do in this step (1-2 sentences, be specific and realistic)
+- **Observation**: What you notice, feel, or experience as a result (1-2 sentences)
+- **Challenge**: Any difficulty, friction, confusion, or concern you encounter (1-2 sentences)
 
 Guidelines:
 - Be authentic to the character's background and expertise level
@@ -18,4 +18,6 @@ Guidelines:
 - Think about accessibility, usability, and contextual factors
 - Consider the full journey from initial interaction to completion
 
-Simulate the 3-step experience now:
+Keep each field (Action, Observation, Challenge) to 1-2 sentences. Be concrete and specific, not exhaustive.
+
+Simulate the 2-step experience now:
