@@ -30,8 +30,22 @@ const getPriorityLabel = (priority: Need['priority']): string => {
   return `${priority} Priority`;
 };
 
+// Extract first phrase/sentence from need statement (up to first period, comma, or reasonable length)
+const getSummary = (text: string): string => {
+  if (!text) return '';
+  // Get first sentence or first 60 characters
+  const firstSentence = text.split(/[.!?]/)[0].trim();
+  if (firstSentence.length <= 60) {
+    return firstSentence;
+  }
+  // If first sentence is too long, truncate at word boundary
+  return firstSentence.substring(0, 60).split(' ').slice(0, -1).join(' ') + '...';
+};
+
 export function NeedCard({ need, index }: NeedCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const summary = getSummary(need.need_statement);
+  const showsSummary = summary !== need.need_statement;
 
   return (
     <motion.div
@@ -53,14 +67,19 @@ export function NeedCard({ need, index }: NeedCardProps) {
                 {getPriorityLabel(need.priority)}
               </Badge>
             </div>
-            {isExpanded ? (
+            {isExpanded || showsSummary ? (
               <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             ) : (
               <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             )}
           </div>
-          <p className="text-sm font-medium">{need.need_statement}</p>
           
+          {/* Summary or Full Statement */}
+          <p className="text-sm font-medium">
+            {isExpanded ? need.need_statement : summary}
+          </p>
+          
+          {/* Expandable Details */}
           <AnimatePresence>
             {isExpanded && (
               <motion.div
@@ -70,6 +89,12 @@ export function NeedCard({ need, index }: NeedCardProps) {
                 transition={{ duration: 0.2 }}
                 className="space-y-3 pt-2 border-t overflow-hidden"
               >
+                {showsSummary && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Full Need:</p>
+                    <p className="text-xs text-foreground/80">{need.need_statement}</p>
+                  </div>
+                )}
                 {need.design_implication && (
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-1">Design Implication:</p>
