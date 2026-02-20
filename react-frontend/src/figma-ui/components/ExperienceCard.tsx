@@ -31,9 +31,9 @@ function getAvatarUrl(agent: { name: string; gender?: string }): string {
 }
 
 function ExperienceStep({ step }: ExperienceStepProps) {
-  const [actionOpen, setActionOpen] = useState(true);
-  const [observationOpen, setObservationOpen] = useState(true);
-  const [challengeOpen, setChallengeOpen] = useState(true);
+  const [actionOpen, setActionOpen] = useState(false);
+  const [observationOpen, setObservationOpen] = useState(false);
+  const [challengeOpen, setChallengeOpen] = useState(false);
 
   return (
     <div className="space-y-2 border-b pb-3 last:border-0">

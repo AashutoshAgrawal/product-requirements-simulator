@@ -34,6 +34,7 @@ class OpenAIClient(BaseLLMClient):
         self,
         model_name: str = "gpt-3.5-turbo",
         temperature: float = 0.7,
+        seed: Optional[int] = None,
         max_retries: int = 3,
         retry_delay: int = 2,
         rate_limit_delay: float = 0.0,
@@ -55,6 +56,7 @@ class OpenAIClient(BaseLLMClient):
         """
         self.model_name = model_name
         self.temperature = temperature
+        self.seed = seed
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.rate_limit_delay = rate_limit_delay
@@ -111,14 +113,17 @@ class OpenAIClient(BaseLLMClient):
         
         # Prepare API parameters
         temp_value = temperature if temperature is not None else self.temperature
-        # gpt-5-nano only supports temperature=1; API rejects other values
-        if self.model_name and "gpt-5-nano" in self.model_name.lower():
+        # gpt-5 models only support temperature=1; API rejects other values
+        if self.model_name and "gpt-5" in self.model_name.lower():
             temp_value = 1.0
         params = {
             "model": self.model_name,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": temp_value,
         }
+
+        if self.seed is not None:
+            params["seed"] = self.seed
 
         if max_output_tokens:
             params["max_tokens"] = max_output_tokens
@@ -209,6 +214,7 @@ class OpenAIClient(BaseLLMClient):
             "provider": "openai",
             "model_name": self.model_name,
             "temperature": self.temperature,
+            "seed": self.seed,
             "max_retries": self.max_retries,
             "retry_delay": self.retry_delay,
             "rate_limit_delay": self.rate_limit_delay

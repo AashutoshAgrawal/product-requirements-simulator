@@ -41,6 +41,7 @@ def create_llm_client(
         client = OpenAIClient(
             model_name=llm_config.get('model_name', 'gpt-4o-mini'),
             temperature=llm_config.get('temperature', 0.7),
+            seed=llm_config.get('seed'),
             max_retries=llm_config.get('max_retries', 3),
             retry_delay=llm_config.get('retry_delay', 2),
             rate_limit_delay=llm_config.get('rate_limit_delay', 0.0),
