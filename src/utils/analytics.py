@@ -160,19 +160,17 @@ class AnalyticsCollector:
     
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """Calculate approximate cost based on model and tokens."""
-        # Pricing per 1M tokens (approximate as of 2024)
+        # Pricing per 1M tokens (source: OpenAI pricing page, as of 2025)
         pricing = {
-            "gpt-5-nano": {"input": 0.0001, "output": 0.0002},
-            "gpt-4": {"input": 0.03, "output": 0.06},
-            "gpt-4-turbo": {"input": 0.01, "output": 0.03},
-            "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
-            "gpt-3.5-turbo": {"input": 0.0005, "output": 0.0015},
-            "gemini-pro": {"input": 0.00025, "output": 0.0005},
-            "gemini-1.5-pro": {"input": 0.00125, "output": 0.00375},
+            "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+            "gpt-4o": {"input": 2.50, "output": 10.00},
+            "gpt-4-turbo": {"input": 10.00, "output": 30.00},
+            "gpt-4": {"input": 30.00, "output": 60.00},
+            "gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
         }
         
         # Default pricing if model not found
-        default_pricing = {"input": 0.01, "output": 0.03}
+        default_pricing = {"input": 0.15, "output": 0.60}
         
         model_lower = model.lower()
         model_pricing = default_pricing
