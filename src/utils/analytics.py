@@ -160,7 +160,7 @@ class AnalyticsCollector:
     
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
         """Calculate approximate cost based on model and tokens."""
-        # Pricing per 1K tokens (approximate as of 2024)
+        # Pricing per 1M tokens (approximate as of 2024)
         pricing = {
             "gpt-5-nano": {"input": 0.0001, "output": 0.0002},
             "gpt-4": {"input": 0.03, "output": 0.06},
@@ -182,8 +182,8 @@ class AnalyticsCollector:
                 model_pricing = pricing[key]
                 break
         
-        input_cost = (input_tokens / 1000) * model_pricing["input"]
-        output_cost = (output_tokens / 1000) * model_pricing["output"]
+        input_cost = (input_tokens / 1_000_000) * model_pricing["input"]
+        output_cost = (output_tokens / 1_000_000) * model_pricing["output"]
         
         return input_cost + output_cost
     
