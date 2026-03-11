@@ -130,18 +130,13 @@ OPENAI_API_KEY_1=key1
 OPENAI_API_KEY_2=key2
 ```
 
-**Google Gemini (alternative):**
-```bash
-GOOGLE_API_KEY=your_gemini_key
-```
-
 ### System Configuration
 
 Edit `config/settings.yaml`:
 
 ```yaml
 agent_generation:
-  default_n_agents: 5
+  default_n_agents: 1
   default_design_context: "smartwatch"
 
 experience_simulation:
