@@ -16,3 +16,4 @@ docker-compose.yml
 requirements.txt
 *.py
 render.yaml
+# Vercel rebuild trigger
