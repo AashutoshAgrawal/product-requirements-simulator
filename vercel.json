@@ -1,6 +1,9 @@
 {
-  "installCommand": "cd react-frontend && npm install --legacy-peer-deps",
-  "buildCommand": "cd react-frontend && CI=false npm run build",
+  "installCommand": "npm install --prefix ./react-frontend --legacy-peer-deps",
+  "buildCommand": "npm run build --prefix ./react-frontend",
   "outputDirectory": "react-frontend/build",
-  "framework": "react"
+  "framework": "react",
+  "env": {
+    "CI": "false"
+  }
 }
