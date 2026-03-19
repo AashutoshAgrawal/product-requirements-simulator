@@ -1,9 +1,0 @@
-{
-  "name": "product-requirements-simulator",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "install:frontend": "cd react-frontend && npm install --legacy-peer-deps",
-    "build": "cd react-frontend && CI=false npm run build"
-  }
-}
