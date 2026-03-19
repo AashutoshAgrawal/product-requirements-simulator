@@ -2,8 +2,7 @@
   "installCommand": "cd react-frontend && npm install --legacy-peer-deps",
   "buildCommand": "bash build.sh",
   "outputDirectory": "react-frontend/build",
-  "framework": "other",
-  "regions": ["iad1"]
+  "framework": "create-react-app"
 }
 
 
