@@ -5,7 +5,7 @@
 PROJECT_ID="your-gcp-project-id"
 REGION="us-central1"
 SERVICE_NAME="elicitron-backend"
-API_KEY="your_gemini_api_key_here"
+API_KEY="your_openai_api_key_here"
 
 echo "🚀 Deploying Elicitron Backend to Google Cloud Run..."
 
@@ -15,7 +15,7 @@ gcloud run deploy $SERVICE_NAME \
   --platform managed \
   --region $REGION \
   --allow-unauthenticated \
-  --set-env-vars GOOGLE_API_KEY=$API_KEY \
+  --set-env-vars OPENAI_API_KEY=$API_KEY \
   --memory 512Mi \
   --timeout 300
 

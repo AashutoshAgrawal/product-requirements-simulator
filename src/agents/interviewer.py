@@ -8,7 +8,7 @@ based on their experiences.
 from typing import List, Dict, Any, Optional
 import os
 
-from ..llm.gemini_client import GeminiClient
+from ..llm.openai_client import OpenAIClient
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,26 +17,26 @@ logger = get_logger(__name__)
 class Interviewer:
     """
     Conducts structured interviews with user agents.
-    
+
     This class poses questions to agents based on their simulated experiences
     and collects their responses for analysis.
-    
+
     Attributes:
-        llm_client (GeminiClient): The LLM client for interview simulation
+        llm_client (OpenAIClient): The LLM client for interview simulation
         prompt_template (str): Template for interview prompts
         questions (List[str]): List of interview questions
     """
-    
+
     def __init__(
         self,
-        llm_client: GeminiClient,
+        llm_client: OpenAIClient,
         questions: Optional[List[str]] = None
     ):
         """
         Initialize the interviewer.
-        
+
         Args:
-            llm_client: An initialized Gemini client instance
+            llm_client: An initialized OpenAI client instance
             questions: Optional list of interview questions
         """
         self.llm_client = llm_client

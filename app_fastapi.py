@@ -68,7 +68,7 @@ class AnalyzeRequest(BaseModel):
     product: str = Field(..., min_length=1, description="Product name or idea")
     design_context: str = Field(..., min_length=1, description="Design context or usage scenario")
     n_agents: int = Field(default=1, ge=1, le=5, description="Number of agent personas to generate")
-    pipeline_mode: str = Field(default="sequential", description="Pipeline execution mode: 'sequential' or 'parallel'")
+    pipeline_mode: str = Field(default="parallel", description="Pipeline execution mode: 'sequential' or 'parallel'")
 
     class Config:
         json_schema_extra = {
@@ -76,7 +76,7 @@ class AnalyzeRequest(BaseModel):
                 "product": "camping tent",
                 "design_context": "ultralight backpacking in alpine conditions",
                 "n_agents": 1,
-                "pipeline_mode": "sequential"
+                "pipeline_mode": "parallel"
             }
         }
 
@@ -91,7 +91,7 @@ class RunInput(BaseModel):
     product: str = ""
     design_context: str = ""
     n_agents: int = 0
-    pipeline_mode: str = "sequential"
+    pipeline_mode: str = "parallel"
 
 
 class JobStatusResponse(BaseModel):
@@ -152,7 +152,7 @@ def load_interview_questions(questions_path: str = "config/interview_questions.y
     return []
 
 
-async def run_pipeline_async(job_id: str, product_idea: str, design_context: str, n_agents: int, pipeline_mode: str = "sequential"):
+async def run_pipeline_async(job_id: str, product_idea: str, design_context: str, n_agents: int, pipeline_mode: str = "parallel"):
     """
     Run the requirements elicitation pipeline asynchronously.
     
@@ -533,7 +533,7 @@ async def analyze(request: AnalyzeRequest, background_tasks: BackgroundTasks):
     # Validate pipeline mode
     pipeline_mode = request.pipeline_mode.lower()
     if pipeline_mode not in ["sequential", "parallel"]:
-        pipeline_mode = "sequential"
+        pipeline_mode = "parallel"
     
     # Initialize job
     jobs[job_id] = {
@@ -580,7 +580,7 @@ async def get_status(job_id: str):
             product=job.get("product", ""),
             design_context=job.get("design_context", ""),
             n_agents=job.get("n_agents", 0),
-            pipeline_mode=job.get("pipeline_mode", "sequential")
+            pipeline_mode=job.get("pipeline_mode", "parallel")
         )
     return JobStatusResponse(
         job_id=job_id,
@@ -614,7 +614,7 @@ async def get_results(job_id: str):
             product=job.get("product", ""),
             design_context=job.get("design_context", ""),
             n_agents=job.get("n_agents", 0),
-            pipeline_mode=job.get("pipeline_mode", "sequential")
+            pipeline_mode=job.get("pipeline_mode", "parallel")
         )
     return ResultsResponse(
         job_id=job_id,
@@ -655,7 +655,7 @@ async def list_saved_runs():
                 "start_time": meta.get("start_time", ""),
                 "duration_seconds": meta.get("duration_seconds", 0),
                 "total_needs": total_needs,
-                "mode": meta.get("mode", "sequential"),
+                "mode": meta.get("mode", "parallel"),
             })
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"Could not read run {path.name}: {e}")

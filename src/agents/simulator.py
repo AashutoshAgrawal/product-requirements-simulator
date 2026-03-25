@@ -7,7 +7,7 @@ This module simulates user experiences with products based on agent personas.
 from typing import List, Dict, Any, Optional
 import os
 
-from ..llm.gemini_client import GeminiClient
+from ..llm.openai_client import OpenAIClient
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,21 +16,21 @@ logger = get_logger(__name__)
 class ExperienceSimulator:
     """
     Simulates user experiences based on agent personas.
-    
+
     This class generates step-by-step interaction scenarios including
     actions, observations, and challenges for each agent.
-    
+
     Attributes:
-        llm_client (GeminiClient): The LLM client for simulation
+        llm_client (OpenAIClient): The LLM client for simulation
         prompt_template (str): Template for experience simulation prompts
     """
-    
-    def __init__(self, llm_client: GeminiClient):
+
+    def __init__(self, llm_client: OpenAIClient):
         """
         Initialize the experience simulator.
-        
+
         Args:
-            llm_client: An initialized Gemini client instance
+            llm_client: An initialized OpenAI client instance
         """
         self.llm_client = llm_client
         self.prompt_template = self._load_prompt_template()

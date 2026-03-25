@@ -10,7 +10,7 @@ import os
 
 import json
 
-from ..llm.gemini_client import GeminiClient
+from ..llm.openai_client import OpenAIClient
 from ..utils.logger import get_logger
 from ..utils.json_parser import safe_parse_json
 
@@ -20,21 +20,21 @@ logger = get_logger(__name__)
 class LatentNeedExtractor:
     """
     Extracts and classifies latent needs from interview responses.
-    
+
     This class analyzes user responses to identify underlying needs,
     categorize them, and suggest design implications.
-    
+
     Attributes:
-        llm_client (GeminiClient): The LLM client for analysis
+        llm_client (OpenAIClient): The LLM client for analysis
         prompt_template (str): Template for need extraction prompts
     """
-    
-    def __init__(self, llm_client: GeminiClient):
+
+    def __init__(self, llm_client: OpenAIClient):
         """
         Initialize the latent need extractor.
-        
+
         Args:
-            llm_client: An initialized Gemini client instance
+            llm_client: An initialized OpenAI client instance
         """
         self.llm_client = llm_client
         self.prompt_template = self._load_prompt_template()

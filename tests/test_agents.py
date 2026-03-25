@@ -12,7 +12,7 @@ import os
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.llm.gemini_client import GeminiClient
+from src.llm.openai_client import OpenAIClient
 from src.agents.generator import AgentGenerator
 from src.agents.simulator import ExperienceSimulator
 from src.agents.interviewer import Interviewer
@@ -25,7 +25,7 @@ class TestAgentGenerator:
     @pytest.fixture
     def mock_llm_client(self):
         """Create a mock LLM client."""
-        mock_client = Mock(spec=GeminiClient)
+        mock_client = Mock(spec=OpenAIClient)
         mock_client.run.return_value = "Name: Test Agent\nDescription: Test description"
         return mock_client
     
@@ -69,7 +69,7 @@ class TestExperienceSimulator:
     @pytest.fixture
     def mock_llm_client(self):
         """Create a mock LLM client."""
-        mock_client = Mock(spec=GeminiClient)
+        mock_client = Mock(spec=OpenAIClient)
         mock_client.run.return_value = "Step 1: Action...\nStep 2: Action...\nStep 3: Action..."
         return mock_client
     
@@ -106,7 +106,7 @@ class TestInterviewer:
     @pytest.fixture
     def mock_llm_client(self):
         """Create a mock LLM client."""
-        mock_client = Mock(spec=GeminiClient)
+        mock_client = Mock(spec=OpenAIClient)
         mock_client.run.return_value = "This is a test answer."
         return mock_client
     
@@ -158,7 +158,7 @@ class TestLatentNeedExtractor:
     @pytest.fixture
     def mock_llm_client(self):
         """Create a mock LLM client."""
-        mock_client = Mock(spec=GeminiClient)
+        mock_client = Mock(spec=OpenAIClient)
         mock_client.run.return_value = '''```json
 {
   "needs": [

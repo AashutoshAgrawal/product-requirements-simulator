@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 
-from ..llm.gemini_client import GeminiClient
+from ..llm.openai_client import OpenAIClient
 from ..agents.generator import AgentGenerator
 from ..agents.simulator import ExperienceSimulator
 from ..agents.interviewer import Interviewer
@@ -30,7 +30,7 @@ class BasePipeline:
     
     def __init__(
         self,
-        llm_client: GeminiClient,
+        llm_client: OpenAIClient,
         interview_questions: Optional[List[str]] = None,
         analytics_collector: Optional[AnalyticsCollector] = None
     ):

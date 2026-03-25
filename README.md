@@ -21,7 +21,7 @@ Elicitron automates the requirements elicitation process through AI-powered simu
 
 **Backend:**
 - FastAPI 0.115.0 (modern async Python web framework)
-- OpenAI GPT-4o-mini or Google Gemini 2.5 Flash (configurable LLM)
+- OpenAI GPT-4o-mini (default LLM)
 - Uvicorn (high-performance ASGI server)
 - Pydantic (type-safe data validation)
 
@@ -110,12 +110,12 @@ npm start
 
 ### LLM Provider
 
-The system supports both OpenAI and Google Gemini. Configure in `config/settings.yaml`:
+Configure the OpenAI model in `config/settings.yaml`:
 
 ```yaml
 llm:
-  provider: "openai"  # Options: "openai" or "gemini"
-  model_name: "gpt-4o-mini"  # OpenAI: "gpt-4o-mini", "gpt-4o" | Gemini: "gemini-2.5-flash"
+  provider: "openai"
+  model_name: "gpt-4o-mini"  # Options: "gpt-4o-mini", "gpt-4o"
   temperature: 0.0  # Lower = more deterministic
   seed: 42  # For reproducible OpenAI outputs
 ```
@@ -228,7 +228,7 @@ product-requirements-simulator/
 │   ├── api_keys.py              # API key management
 │   └── interview_questions.yaml
 ├── src/                          # Core Pipeline Logic
-│   ├── llm/                     # LLM clients (OpenAI, Gemini)
+│   ├── llm/                     # LLM client (OpenAI)
 │   ├── agents/                  # Generator, Simulator, Interviewer, Extractor
 │   ├── pipeline/                 # Sequential & parallel pipelines
 │   └── utils/                   # Analytics, logging, JSON parsing
@@ -276,7 +276,7 @@ pytest tests/ --cov=src --cov-report=html
 2. Connect repo to Render.com
 3. Use render.yaml (auto-detected)
 4. Add environment variables:
-   - `OPENAI_API_KEY` (or `GOOGLE_API_KEY` for Gemini)
+   - `OPENAI_API_KEY`
 
 ### Frontend (Vercel)
 
@@ -383,7 +383,7 @@ This project is provided as-is for educational and research purposes.
 ## 🙏 Acknowledgments
 
 - **Methodology**: Inspired by the Elicitron requirements elicitation research
-- **AI Models**: OpenAI GPT-4o-mini or Google Gemini 2.5 Flash
+- **AI Models**: OpenAI GPT-4o-mini
 - **Frameworks**: FastAPI and React
 
 ---

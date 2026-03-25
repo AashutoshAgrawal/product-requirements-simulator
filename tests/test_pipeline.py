@@ -12,7 +12,7 @@ import os
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.llm.gemini_client import GeminiClient
+from src.llm.openai_client import OpenAIClient
 from src.pipeline.pipeline import RequirementsPipeline
 
 
@@ -22,7 +22,7 @@ class TestRequirementsPipeline:
     @pytest.fixture
     def mock_llm_client(self):
         """Create a mock LLM client."""
-        mock_client = Mock(spec=GeminiClient)
+        mock_client = Mock(spec=OpenAIClient)
         mock_client.run.return_value = "Mock response"
         return mock_client
     
@@ -128,7 +128,7 @@ class TestPipelineIntegration:
     @pytest.fixture
     def mock_client_with_responses(self):
         """Create mock client with predefined responses."""
-        mock_client = Mock(spec=GeminiClient)
+        mock_client = Mock(spec=OpenAIClient)
         
         responses = {
             'agent': 'Name: Test Agent\nDescription: A test user',

@@ -8,7 +8,7 @@ for requirements elicitation studies.
 from typing import List, Dict, Any
 import os
 
-from ..llm.gemini_client import GeminiClient
+from ..llm.openai_client import OpenAIClient
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,21 +17,21 @@ logger = get_logger(__name__)
 class AgentGenerator:
     """
     Generates diverse user agents for product research.
-    
+
     This class creates user personas by iteratively prompting the LLM
     while maintaining context to ensure diversity across generated agents.
-    
+
     Attributes:
-        llm_client (GeminiClient): The LLM client for generation
+        llm_client (OpenAIClient): The LLM client for generation
         prompt_template (str): Template for agent generation prompts
     """
-    
-    def __init__(self, llm_client: GeminiClient):
+
+    def __init__(self, llm_client: OpenAIClient):
         """
         Initialize the agent generator.
-        
+
         Args:
-            llm_client: An initialized Gemini client instance
+            llm_client: An initialized OpenAI client instance
         """
         self.llm_client = llm_client
         self.prompt_template = self._load_prompt_template()
