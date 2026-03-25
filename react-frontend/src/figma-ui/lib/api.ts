@@ -6,7 +6,7 @@ import axios from 'axios';
 // Use environment variable or default to localhost
 const API_BASE_URL = process.env.REACT_APP_API_URL ||
   (process.env.NODE_ENV === 'production'
-    ? 'https://elicitron-backend.onrender.com'
+    ? 'https://needgen-backend.onrender.com'
     : 'http://localhost:8000');
 
 // Type definitions matching Figma components

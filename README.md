@@ -1,14 +1,14 @@
-# Elicitron - AI-Powered Requirements Elicitation
+# NeedGen - AI-Powered Requirements Elicitation
 
-A production-grade **FastAPI + React** full-stack web application that automates requirements elicitation using the Elicitron methodology with AI-powered simulation.
+A production-grade **FastAPI + React** full-stack web application that automates requirements elicitation based on the Elicitron methodology with AI-powered simulation.
 
 **Live Demo:**
 - 🚀 **Frontend**: https://product-requirements-simulator.vercel.app
-- 🔧 **Backend**: https://elicitron-backend.onrender.com
+- 🔧 **Backend**: https://needgen-backend.onrender.com
 
-## 🎯 What is Elicitron?
+## 🎯 What is NeedGen?
 
-Elicitron automates the requirements elicitation process through AI-powered simulation:
+NeedGen automates the requirements elicitation process through AI-powered simulation:
 
 1. **Agent Generation** - Creates diverse user personas with varied backgrounds and needs
 2. **Experience Simulation** - Simulates realistic user interactions (Action/Observation/Challenge)

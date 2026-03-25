@@ -117,7 +117,7 @@ export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewPro
     const maxWidth = pageWidth - (margin * 2);
 
     doc.setFontSize(18);
-    doc.text('Elicitron – Requirements Report', margin, y, { maxWidth });
+    doc.text('NeedGen – Requirements Report', margin, y, { maxWidth });
     y += lineHeight * 2;
 
     doc.setFontSize(12);
@@ -166,7 +166,7 @@ export function ResultsView({ data, onStartNew, onViewPastRuns }: ResultsViewPro
       y += lineHeight * detailLines.length + lineHeight * 0.2;
     });
 
-    doc.save(`elicitron-report-${runInput?.product?.replace(/\s+/g, '-') || 'run'}-${Date.now()}.pdf`);
+    doc.save(`needgen-report-${runInput?.product?.replace(/\s+/g, '-') || 'run'}-${Date.now()}.pdf`);
   };
 
   return (

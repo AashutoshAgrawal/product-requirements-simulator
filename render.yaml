@@ -2,7 +2,7 @@
 services:
   # FastAPI Backend
   - type: web
-    name: elicitron-backend
+    name: needgen-backend
     env: python
     region: oregon
     plan: free
@@ -12,7 +12,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       # Add your API keys in Render Dashboard (not here in code)
-      # Go to: Dashboard > elicitron-backend > Environment
+      # Go to: Dashboard > needgen-backend > Environment
       # Add these variables:
       # OPENAI_API_KEY_1 = your_first_key
       # OPENAI_API_KEY_2 = your_second_key

@@ -7,7 +7,7 @@ import { Slider } from './ui/slider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Sparkles, History, Lightbulb, RefreshCw, FileText } from 'lucide-react';
 
-const PROMPT_HISTORY_KEY = 'elicitron_prompt_history';
+const PROMPT_HISTORY_KEY = 'needgen_prompt_history';
 const MAX_HISTORY_ITEMS = 10;
 
 // Pool of 15 Quick Start ideas; we randomly show 3 each time
@@ -139,7 +139,7 @@ export function InputForm({ onSubmit, onReproducibilityTest, onViewPastRuns }: I
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-2">
             <Sparkles className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-4xl font-bold mb-2">Elicitron</h1>
+          <h1 className="text-4xl font-bold mb-2">NeedGen</h1>
           <p className="text-muted-foreground">
             AI-powered requirements elicitation through simulated user interviews
           </p>

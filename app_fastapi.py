@@ -1,5 +1,5 @@
 """
-FastAPI Application for Elicitron Requirements Elicitation Pipeline
+FastAPI Application for NeedGen Requirements Elicitation Pipeline
 
 Modern, production-grade API with:
 - Auto-generated OpenAPI docs
@@ -41,8 +41,8 @@ from src.utils.reproducibility import ReproducibilityTester
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Elicitron API",
-    description="AI-powered requirements elicitation using the Elicitron methodology",
+    title="NeedGen API",
+    description="AI-powered requirements elicitation based on the Elicitron methodology",
     version="2.0.0",
     docs_url="/docs",  # Swagger UI
     redoc_url="/redoc"  # ReDoc
@@ -496,7 +496,7 @@ async def root():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "service": "Elicitron API",
+        "service": "NeedGen API",
         "version": "2.0.0",
         "docs": "/docs",
         "redoc": "/redoc"
@@ -513,7 +513,7 @@ async def health_check():
         "status": "healthy",
         "version": "2.0.0",
         "timestamp": datetime.utcnow().isoformat(),
-        "service": "elicitron-backend"
+        "service": "needgen-backend"
     }
 
 

@@ -1,5 +1,5 @@
 """
-API Key Management for Elicitron
+API Key Management for NeedGen
 Reads keys from environment variables for security.
 """
 import os

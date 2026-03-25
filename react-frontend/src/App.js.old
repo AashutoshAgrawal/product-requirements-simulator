@@ -264,7 +264,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>🎯 Elicitron</h1>
+        <h1>🎯 NeedGen</h1>
         <p>AI-Powered Requirements Elicitation</p>
       </header>
 
@@ -811,7 +811,7 @@ function App() {
                   const url = URL.createObjectURL(dataBlob);
                   const link = document.createElement('a');
                   link.href = url;
-                  link.download = `elicitron_results_${Date.now()}.json`;
+                  link.download = `needgen_results_${Date.now()}.json`;
                   link.click();
                 }}
                 className="btn-primary"

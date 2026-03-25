@@ -1,13 +1,13 @@
 #!/bin/bash
-# Deploy Elicitron to Google Cloud Run
+# Deploy NeedGen to Google Cloud Run
 
 # Set variables
 PROJECT_ID="your-gcp-project-id"
 REGION="us-central1"
-SERVICE_NAME="elicitron-backend"
+SERVICE_NAME="needgen-backend"
 API_KEY="your_openai_api_key_here"
 
-echo "🚀 Deploying Elicitron Backend to Google Cloud Run..."
+echo "🚀 Deploying NeedGen Backend to Google Cloud Run..."
 
 # Build and deploy backend
 gcloud run deploy $SERVICE_NAME \

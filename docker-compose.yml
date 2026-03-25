@@ -15,7 +15,7 @@ services:
       - ./app_fastapi.py:/app/app_fastapi.py
     command: uvicorn app_fastapi:app --host 0.0.0.0 --port 8000 --reload
     networks:
-      - elicitron-network
+      - needgen-network
 
   frontend:
     build:
@@ -26,8 +26,8 @@ services:
     depends_on:
       - backend
     networks:
-      - elicitron-network
+      - needgen-network
 
 networks:
-  elicitron-network:
+  needgen-network:
     driver: bridge
