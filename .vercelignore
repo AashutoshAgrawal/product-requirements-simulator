@@ -7,9 +7,9 @@ __pycache__
 .pytest_cache
 logs
 results
-src
-tests
-config
+/src
+/tests
+/config
 *.md
 Dockerfile
 docker-compose.yml
